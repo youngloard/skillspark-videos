@@ -1,0 +1,432 @@
+import Link from "next/link";
+import { prisma } from "@/lib/db";
+import { requireAdmin } from "@/lib/authorization";
+import ActionForm from "@/components/ActionForm";
+import {
+  getStudentsWithCourseAccess,
+  getStudentAccessSources,
+  filterStudentsByCoursePath,
+  type CoursePathFilter,
+} from "@/lib/course-access";
+import {
+  getActiveBatches,
+  getActiveCourses,
+  getActivePackages,
+} from "@/lib/catalog-cache";
+import { bulkAction, resolveStudentIdentifiers } from "@/actions/bulk";
+import Dropdown from "@/components/Dropdown";
+
+type SP = {
+  courseId?: string;
+  expired?: string;
+  status?: string;
+  pathFilter?: string;
+  batchId?: string;
+};
+
+const PATH_FILTERS: { value: CoursePathFilter; label: string }[] = [
+  { value: "any", label: "Any path" },
+  { value: "via_direct_course", label: "Via direct course" },
+  { value: "via_direct_package", label: "Via direct package" },
+  { value: "via_batch_course", label: "Via batch course" },
+  { value: "via_batch_package", label: "Via batch package" },
+  { value: "not_via_direct_package", label: "NOT via any direct package" },
+  { value: "not_via_any_package", label: "NOT via any package" },
+  { value: "only_direct_course", label: "Only via direct course" },
+  { value: "only_via_batch", label: "Only via batch" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "", label: "Any status" },
+  { value: "active", label: "Active" },
+  { value: "blocked", label: "Blocked" },
+];
+
+const EXPIRY_OPTIONS = [
+  { value: "", label: "Any expiry" },
+  { value: "yes", label: "Expired" },
+  { value: "no", label: "Not expired" },
+];
+
+const BULK_ACTIONS = [
+  { value: "deny_course", label: "Deny course (hard block)" },
+  { value: "undeny_course", label: "Undeny course" },
+  { value: "revoke_course", label: "Revoke direct course enrollment" },
+  { value: "revoke_package", label: "Revoke direct package enrollment" },
+  { value: "block", label: "Block students" },
+  { value: "activate", label: "Activate students" },
+  { value: "set_end_date", label: "Set access end date" },
+];
+
+async function loadResults(sp: SP) {
+  if (!sp.courseId)
+    return {
+      ids: [] as string[],
+      students: [] as Awaited<ReturnType<typeof prisma.student.findMany>>,
+    };
+  let ids = await getStudentsWithCourseAccess(sp.courseId);
+  if (ids.length === 0) return { ids, students: [] };
+
+  const pathFilter = (sp.pathFilter as CoursePathFilter | undefined) ?? "any";
+  if (pathFilter !== "any") {
+    ids = await filterStudentsByCoursePath(ids, sp.courseId, pathFilter);
+    if (ids.length === 0) return { ids, students: [] };
+  }
+
+  const where: any = { id: { in: ids } };
+  if (sp.status === "active" || sp.status === "blocked") where.status = sp.status;
+  if (sp.batchId) where.batchId = sp.batchId;
+  if (sp.expired === "yes") where.accessEndDate = { lt: new Date() };
+  if (sp.expired === "no")
+    where.AND = [
+      { accessEndDate: { gte: new Date() } },
+      { accessStartDate: { lte: new Date() } },
+    ];
+  const students = await prisma.student.findMany({
+    where,
+    include: { batch: true },
+    orderBy: { name: "asc" },
+  });
+  return { ids: students.map((s) => s.id), students };
+}
+
+export default async function AdminSearch({
+  searchParams,
+}: {
+  searchParams: Promise<SP>;
+}) {
+  await requireAdmin();
+  const sp = await searchParams;
+  const [courses, packages, batches] = await Promise.all([
+    getActiveCourses(),
+    getActivePackages(),
+    getActiveBatches(),
+  ]);
+
+  const { students } = await loadResults(sp);
+  const sourcesByStudent = new Map<string, string[]>();
+  if (sp.courseId) {
+    for (const s of students) {
+      sourcesByStudent.set(s.id, await getStudentAccessSources(s.id, sp.courseId));
+    }
+  }
+
+  const courseOptions = [
+    { value: "", label: "— pick a course —" },
+    ...courses.map((c) => ({ value: c.id, label: c.name })),
+  ];
+  const packageOptions = [
+    { value: "", label: "—" },
+    ...packages.map((p) => ({ value: p.id, label: p.name })),
+  ];
+  const batchOptions = [
+    { value: "", label: "Any batch" },
+    ...batches.map((b) => ({ value: b.id, label: b.batchCode, hint: b.batchName })),
+  ];
+  const pathOptions = PATH_FILTERS.map((p) => ({ value: p.value, label: p.label }));
+
+  return (
+    <div className="wide-canvas">
+      <h1>Search & bulk operations</h1>
+
+      <h2>Filter Results</h2>
+      <form className="filter-bar" method="get">
+        <Dropdown
+          name="courseId"
+          options={courseOptions}
+          defaultValue={sp.courseId ?? ""}
+          placeholder="Pick a course"
+          label="Course"
+          minWidth={220}
+        />
+        <Dropdown
+          name="pathFilter"
+          options={pathOptions}
+          defaultValue={sp.pathFilter ?? "any"}
+          placeholder="Any path"
+          label="Path"
+          minWidth={200}
+        />
+        <Dropdown
+          name="status"
+          options={STATUS_OPTIONS}
+          defaultValue={sp.status ?? ""}
+          placeholder="Any status"
+          label="Status"
+        />
+        <Dropdown
+          name="batchId"
+          options={batchOptions}
+          defaultValue={sp.batchId ?? ""}
+          placeholder="Any batch"
+          label="Batch"
+          minWidth={180}
+        />
+        <Dropdown
+          name="expired"
+          options={EXPIRY_OPTIONS}
+          defaultValue={sp.expired ?? ""}
+          placeholder="Any expiry"
+          label="Expiry"
+        />
+        <button type="submit" className="filter-submit">
+          Search
+        </button>
+      </form>
+
+      {sp.courseId && (
+        <div style={{ marginTop: "32px" }}>
+          <h2>
+            Results
+            <span className="count-badge">{students.length}</span>
+          </h2>
+          {students.length === 0 ? (
+            <p className="empty-state">
+              No students match this filter. Pick a different course or path.
+            </p>
+          ) : (
+            <ActionForm
+              successMessage="Bulk action applied."
+              action={async (fd: FormData) => {
+                "use server";
+                const action = String(fd.get("action") ?? "");
+                const studentIds = fd.getAll("studentIds").map(String);
+                if (studentIds.length === 0)
+                  return { ok: false, error: "Select at least one student." };
+                const targetCourseId =
+                  String(fd.get("targetCourseId") ?? "") || undefined;
+                const targetPackageId =
+                  String(fd.get("targetPackageId") ?? "") || undefined;
+                const reason = String(fd.get("reason") ?? "") || undefined;
+                const endDate = String(fd.get("endDate") ?? "") || undefined;
+                return bulkAction({
+                  action,
+                  studentIds,
+                  ...(action === "revoke_course" ||
+                  action === "deny_course" ||
+                  action === "undeny_course"
+                    ? { courseId: targetCourseId }
+                    : {}),
+                  ...(action === "revoke_package"
+                    ? { packageId: targetPackageId }
+                    : {}),
+                  ...(action === "deny_course" && reason ? { reason } : {}),
+                  ...(action === "set_end_date" ? { endDate } : {}),
+                });
+              }}
+            >
+              <div className="add-student-panel">
+                <div className="form-card-header">
+                  <span>Bulk Action Parameters</span>
+                </div>
+                <div className="form-card-body">
+                  <div className="form-grid">
+                    <div className="form-field-group">
+                      <Dropdown
+                        name="action"
+                        options={BULK_ACTIONS}
+                        defaultValue="deny_course"
+                        label="Action to Perform"
+                        minWidth={260}
+                      />
+                    </div>
+                    <div className="form-field-group">
+                      <Dropdown
+                        name="targetCourseId"
+                        options={courses.map((c) => ({ value: c.id, label: c.name }))}
+                        defaultValue={sp.courseId}
+                        label="Target Course"
+                        minWidth={220}
+                      />
+                    </div>
+                    <div className="form-field-group">
+                      <Dropdown
+                        name="targetPackageId"
+                        options={packageOptions}
+                        defaultValue=""
+                        placeholder="—"
+                        label="Target Package"
+                        minWidth={220}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-grid" style={{ marginTop: "12px" }}>
+                    <div className="form-field-group">
+                      <label>
+                        Reason (for course denial)
+                        <input name="reason" placeholder="Optional context..." />
+                      </label>
+                    </div>
+                    <div className="form-field-group">
+                      <label>
+                        End Date (for setting expiry)
+                        <input name="endDate" type="date" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <h3 style={{ marginTop: "24px", marginBottom: "12px" }}>Checked Students to Process</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th aria-label="Select" style={{ width: "40px" }}></th>
+                      <th>Code</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Batch</th>
+                      <th>Status</th>
+                      <th>Access until</th>
+                      <th>Source</th>
+                      <th aria-label="Actions"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((s: any) => (
+                      <tr key={s.id}>
+                        <td>
+                          <input type="checkbox" name="studentIds" value={s.id} />
+                        </td>
+                        <td>
+                          <code>{s.studentCode}</code>
+                        </td>
+                        <td>
+                          <strong>{s.name}</strong>
+                        </td>
+                        <td className="cell-muted">{s.email}</td>
+                        <td>{s.batch?.batchCode ?? "—"}</td>
+                        <td>
+                          <span
+                            className="status-pill"
+                            data-tone={s.status === "active" ? undefined : "danger"}
+                          >
+                            {s.status}
+                          </span>
+                        </td>
+                        <td className="cell-muted">
+                          {s.accessEndDate.toISOString().slice(0, 10).split("-").reverse().join("/")}
+                        </td>
+                        <td className="cell-muted">
+                          {(sourcesByStudent.get(s.id) ?? []).join(", ") || "—"}
+                        </td>
+                        <td className="row-actions">
+                          <Link href={`/admin/students/${s.id}`}>Edit</Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="form-actions" style={{ marginTop: "16px" }}>
+                <button type="submit">Run action on checked students</button>
+              </div>
+            </ActionForm>
+          )}
+        </div>
+      )}
+
+      <div className="add-student-panel" style={{ marginTop: "32px" }}>
+        <div className="form-card-header">
+          <span>Or Paste Student Codes / Emails</span>
+        </div>
+        <ActionForm
+          className="form-card-body"
+          successMessage="Bulk action applied."
+          action={async (fd: FormData) => {
+            "use server";
+            const text = String(fd.get("identifiers") ?? "");
+            const action = String(fd.get("action") ?? "");
+            const targetCourseId = String(fd.get("targetCourseId") ?? "") || undefined;
+            const targetPackageId = String(fd.get("targetPackageId") ?? "") || undefined;
+            const reason = String(fd.get("reason") ?? "") || undefined;
+            const endDate = String(fd.get("endDate") ?? "") || undefined;
+
+            const r1 = await resolveStudentIdentifiers(text);
+            if (!r1.ok) return r1;
+            if (r1.data.studentIds.length === 0)
+              return { ok: false, error: `No matches; unknown: ${r1.data.unknown.join(", ")}` };
+
+            return bulkAction({
+              action,
+              studentIds: r1.data.studentIds,
+              ...(action === "revoke_course" ||
+              action === "deny_course" ||
+              action === "undeny_course"
+                ? { courseId: targetCourseId }
+                : {}),
+              ...(action === "revoke_package" ? { packageId: targetPackageId } : {}),
+              ...(action === "deny_course" && reason ? { reason } : {}),
+              ...(action === "set_end_date" ? { endDate } : {}),
+            });
+          }}
+        >
+          <p style={{ color: "var(--muted)", fontWeight: "500", marginBottom: "16px" }}>
+            Input one code or email per line. We will resolve them to student records and run the bulk action.
+          </p>
+          <div className="form-field-group" style={{ marginBottom: "20px" }}>
+            <label>
+              Student Identifiers (one per line)
+              <textarea
+                name="identifiers"
+                rows={6}
+                placeholder={"S001\nbob@example.com"}
+                required
+              />
+            </label>
+          </div>
+          <div className="form-grid">
+            <div className="form-field-group">
+              <Dropdown
+                name="action"
+                options={BULK_ACTIONS}
+                defaultValue="deny_course"
+                label="Action"
+                minWidth={260}
+              />
+            </div>
+            <div className="form-field-group">
+              <Dropdown
+                name="targetCourseId"
+                options={[
+                  { value: "", label: "—" },
+                  ...courses.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                defaultValue=""
+                label="Course"
+                minWidth={220}
+              />
+            </div>
+            <div className="form-field-group">
+              <Dropdown
+                name="targetPackageId"
+                options={packageOptions}
+                defaultValue=""
+                label="Package"
+                minWidth={220}
+              />
+            </div>
+          </div>
+          <div className="form-grid" style={{ marginTop: "12px" }}>
+            <div className="form-field-group">
+              <label>
+                Reason
+                <input name="reason" placeholder="Optional context..." />
+              </label>
+            </div>
+            <div className="form-field-group">
+              <label>
+                End Date
+                <input name="endDate" type="date" />
+              </label>
+            </div>
+          </div>
+          <div className="form-actions">
+            <button type="submit">Run on pasted students</button>
+          </div>
+        </ActionForm>
+      </div>
+    </div>
+  );
+}

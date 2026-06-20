@@ -1,0 +1,340 @@
+// LMS V1 — see CLAUDE.md and idea.md
+// Logic-first design. Production runs on PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- NextAuth tables (Prisma adapter) ----------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Domain ----------
+
+// AdminStatus: "active" | "inactive"
+// StudentStatus: "active" | "blocked"
+// ContentStatus: "active" | "inactive"
+// ActorType: "admin" | "student" | "system"
+
+model Admin {
+  id        String      @id @default(cuid())
+  name      String
+  email     String      @unique
+  status    String      @default("active") // "active" | "inactive"
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([email])
+}
+
+model Student {
+  id              String        @id @default(cuid())
+  studentCode     String        @unique
+  name            String
+  email           String        @unique
+  batchId         String?
+  status          String        @default("active") // "active" | "blocked"
+  accessStartDate DateTime
+  accessEndDate   DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  batch            Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  studentPackages  StudentPackage[]
+  studentCourses   StudentCourse[]
+  videoProgress    VideoProgress[]
+  courseDenials    StudentCourseDenial[]
+
+  @@index([email])
+  @@index([studentCode])
+  @@index([batchId])
+  @@index([status])
+  // Recency sorts (admin lists + AI list_students) hit this constantly.
+  @@index([createdAt])
+}
+
+model Batch {
+  id          String   @id @default(cuid())
+  batchCode   String   @unique
+  batchName   String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  students       Student[]
+  batchPackages  BatchPackage[]
+  batchCourses   BatchCourse[]
+
+  @@index([batchCode])
+  @@index([createdAt])
+}
+
+model Package {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  description String?
+  imageUrl    String?       // optional cover image URL
+  status      String        @default("active") // "active" | "inactive"
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  packageCourses  PackageCourse[]
+  studentPackages StudentPackage[]
+  batchPackages   BatchPackage[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Course {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  description String?
+  imageUrl    String?       // optional cover image URL
+  status      String        @default("active") // "active" | "inactive"
+  // layout = "module" → course → modules → videos (default)
+  // layout = "flat"   → course → videos directly (no modules)
+  layout      String        @default("module")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  modules        Module[]
+  videos         Video[]               // videos attached directly (flat layout)
+  packageCourses PackageCourse[]
+  studentCourses StudentCourse[]
+  batchCourses   BatchCourse[]
+  studentDenials StudentCourseDenial[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PackageCourse {
+  id         String   @id @default(cuid())
+  packageId  String
+  courseId   String
+  createdAt  DateTime @default(now())
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, courseId])
+  @@index([courseId])
+}
+
+model StudentPackage {
+  id         String   @id @default(cuid())
+  studentId  String
+  packageId  String
+  assignedAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, packageId])
+  @@index([packageId])
+}
+
+model StudentCourse {
+  id         String   @id @default(cuid())
+  studentId  String
+  courseId   String
+  assignedAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model BatchPackage {
+  id         String   @id @default(cuid())
+  batchId    String
+  packageId  String
+  assignedAt DateTime @default(now())
+
+  batch   Batch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, packageId])
+  @@index([packageId])
+}
+
+model BatchCourse {
+  id         String   @id @default(cuid())
+  batchId    String
+  courseId   String
+  assignedAt DateTime @default(now())
+
+  batch  Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, courseId])
+  @@index([courseId])
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  moduleOrder Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  videos Video[]
+
+  @@index([courseId, moduleOrder])
+}
+
+// Exactly one of moduleId / courseId is set, depending on the parent course's layout.
+// Module-layout course → moduleId set. Flat-layout course → courseId set.
+model Video {
+  id                  String   @id @default(cuid())
+  moduleId            String?
+  courseId            String?
+  title               String
+  description         String?
+  driveFileId         String   // canonical; URL parsed from any Drive link shape
+  videoOrder          Int      @default(0)
+  duration            Int?     // seconds; auto-fetched from Drive API
+  durationFetchedAt   DateTime?
+  status              String   @default("active") // "active" | "inactive"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  module   Module?         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  course   Course?         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  notes    Note[]
+  progress VideoProgress[]
+
+  @@index([moduleId, videoOrder])
+  @@index([courseId, videoOrder])
+  @@index([status])
+}
+
+model Note {
+  id               String   @id @default(cuid())
+  videoId          String
+  title            String
+  // sourceType ∈ "drive" | "url" | "upload" — exactly one source field is set.
+  sourceType       String
+  driveFileId      String?
+  externalUrl      String?
+  uploadPath       String?  // server-relative, e.g. /uploads/notes/{cuid}.pdf
+  originalFileName String?
+  mimeType         String?
+  downloadEnabled  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+}
+
+// Per-student course denial: hard block regardless of grant path.
+// Used by admin to remove access for a single student to a course they got
+// via a package or batch, without removing them from the package/batch.
+model StudentCourseDenial {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  reason    String?
+  deniedAt  DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model VideoProgress {
+  id            String   @id @default(cuid())
+  studentId     String
+  videoId       String
+  lastTimestamp Int      @default(0) // seconds
+  completed     Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  video   Video   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, videoId])
+  @@index([videoId])
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  actorId     String?
+  actorEmail  String?
+  actorType   String    // "admin" | "student" | "system"
+  action      String
+  entityType  String?
+  entityId    String?
+  oldValue    String? // JSON-encoded
+  newValue    String? // JSON-encoded
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([actorEmail])
+  @@index([actorId])
+  @@index([createdAt])
+  // Compound: filter by action then sort by recency — the audit-logs page's
+  // most common request pattern when investigating "what happened recently".
+  @@index([action, createdAt])
+}

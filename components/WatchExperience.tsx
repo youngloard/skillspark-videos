@@ -1,0 +1,357 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Clock,
+  Download,
+  Eye,
+  FileText,
+  Package,
+  Play,
+  PlayCircle,
+} from "lucide-react";
+import VideoPlayer from "@/components/VideoPlayer";
+import { loadWatchPayload } from "@/actions/watch";
+import type { WatchData, LessonNode, WatchNote } from "@/lib/watch";
+
+function formatDuration(s: number): string | null {
+  if (!Number.isFinite(s) || s <= 0) return null;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${sec}s`;
+}
+
+export default function WatchExperience({ initial }: { initial: WatchData }) {
+  const [data, setData] = useState<WatchData>(initial);
+  const [pending, startTransition] = useTransition();
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  // Blocks overlapping in-place navigations (e.g. a fast double-tap on Next)
+  // from racing each other; the closure below can't read `pending` directly.
+  const navLockRef = useRef(false);
+
+  // Sync only on a genuine navigation to a *different* lesson (initial load,
+  // browser back/forward). If the server re-renders this same route for any
+  // other reason and hands back a fresh `initial` for the lesson already on
+  // screen, we keep our live client state untouched — swapping it would reset
+  // the player and re-seek mid-playback. This guards in-place playback against
+  // any stray route refresh.
+  useEffect(() => {
+    setData((prev) =>
+      prev.current.videoId === initial.current.videoId ? prev : initial,
+    );
+  }, [initial]);
+
+  const navigate = useCallback((targetId: string, push = true) => {
+    if (!targetId || targetId === dataRef.current.current.videoId) return;
+    if (navLockRef.current) return;
+    navLockRef.current = true;
+    startTransition(async () => {
+      try {
+        const r = await loadWatchPayload(targetId);
+        if (r.ok) {
+          setData(r.data);
+          if (push) {
+            window.history.pushState(null, "", `/videos/${targetId}`);
+          }
+          // Bring the player into view if the click came from far down the rail.
+          if (typeof window !== "undefined" && window.scrollY > 200) {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }
+        } else {
+          // Access lost or video gone — fall back to a real navigation so the
+          // server can redirect / 404 authoritatively.
+          window.location.assign(`/videos/${targetId}`);
+        }
+      } finally {
+        navLockRef.current = false;
+      }
+    });
+  }, []);
+
+  const { course, tree, current } = data;
+  const progressMap = new Map(
+    data.progress.map((p) => [p.videoId, { lastTimestamp: p.lastTimestamp, completed: p.completed }]),
+  );
+  const totalLessons = current.totalLessons;
+
+  return (
+    <main className="sx-watch" id="main-content" aria-busy={pending}>
+      <Link
+        href={course ? `/courses/${course.id}` : "/dashboard"}
+        className="sx-back"
+      >
+        <ArrowLeft size={14} aria-hidden="true" />
+        {course ? `Back to ${course.name}` : "Back to dashboard"}
+      </Link>
+
+      <div className="sx-watch-grid" data-pending={pending ? "true" : undefined}>
+        <div className="sx-watch-main">
+          {current.embed ? (
+            <VideoPlayer
+              key={current.videoId}
+              videoId={current.videoId}
+              src={current.embed.url}
+              streaming={current.embed.streaming}
+              initialTimestamp={current.timestamp}
+              hasPrev={!!current.prevId}
+              hasNext={!!current.nextId}
+              prevTitle={current.prevTitle}
+              nextTitle={current.nextTitle}
+              onPrev={current.prevId ? () => navigate(current.prevId!) : undefined}
+              onNext={current.nextId ? () => navigate(current.nextId!) : undefined}
+            />
+          ) : (
+            <p className="sx-empty-note">
+              <strong>Video not available.</strong>
+            </p>
+          )}
+
+          <header className="sx-watch-info">
+            {current.moduleTitle ? (
+              <span className="sx-eyebrow">{current.moduleTitle}</span>
+            ) : null}
+            <h1>{current.title}</h1>
+            <div className="sx-watch-meta">
+              <span>
+                <Clock size={13} aria-hidden="true" />
+                {formatDuration(current.duration ?? 0) ?? "Duration pending"}
+              </span>
+              {current.currentIdx >= 0 ? (
+                <span>
+                  <PlayCircle size={13} aria-hidden="true" />
+                  Lesson {current.currentIdx + 1} of {totalLessons}
+                </span>
+              ) : null}
+              {current.timestamp && formatDuration(current.timestamp) ? (
+                <span className="sx-watch-resume">
+                  Resume {formatDuration(current.timestamp)}
+                </span>
+              ) : null}
+            </div>
+            {current.description ? <p>{current.description}</p> : null}
+          </header>
+
+          {current.timestamp && current.embed && !current.embed.supportsResume ? (
+            <p className="sx-note-banner">
+              Drive iframe does not support auto-resume; ask admin to set
+              GOOGLE_DRIVE_API_KEY.
+            </p>
+          ) : null}
+
+          {current.notes.length > 0 && (
+            <section className="sx-notes" aria-labelledby="notes-heading">
+              <header className="sx-rowhead">
+                <div>
+                  <span className="sx-eyebrow">
+                    <FileText size={12} aria-hidden="true" />
+                    Resources
+                  </span>
+                  <h2 id="notes-heading">Notes &amp; references</h2>
+                </div>
+                <div className="sx-rowhead-actions">
+                  <span className="sx-count">{current.notes.length}</span>
+                  {current.hasDownloadableNotes ? (
+                    <a
+                      className="sx-btn sx-btn--ghost sx-btn--sm"
+                      href={`/api/videos/${current.videoId}/notes-zip`}
+                    >
+                      <Package size={14} aria-hidden="true" />
+                      Download all (.zip)
+                    </a>
+                  ) : null}
+                </div>
+              </header>
+              <div className="sx-notes-grid">
+                {current.notes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {totalLessons > 1 && (
+          <aside className="sx-rail" aria-label="Course contents">
+            <div className="sx-rail-head">
+              <div>
+                <span className="sx-eyebrow">Course content</span>
+                {course ? (
+                  <strong className="sx-rail-title">{course.name}</strong>
+                ) : null}
+              </div>
+              <span className="sx-count">{totalLessons}</span>
+            </div>
+            {tree.flatLessons.length > 0 ? (
+              <ol className="sx-rail-list">
+                {tree.flatLessons.map((l, i) => (
+                  <TreeLesson
+                    key={l.id}
+                    lesson={l}
+                    index={i}
+                    isCurrent={l.id === current.videoId}
+                    progress={progressMap.get(l.id) ?? null}
+                    onNavigate={navigate}
+                  />
+                ))}
+              </ol>
+            ) : (
+              <div className="sx-rail-mods">
+                {tree.modules.map((m, mi) => {
+                  const containsCurrent = m.videos.some((v) => v.id === current.videoId);
+                  const moduleDone =
+                    m.videos.length > 0 &&
+                    m.videos.every((v) => progressMap.get(v.id)?.completed);
+                  const totalSecs = m.videos.reduce((s, v) => s + (v.duration ?? 0), 0);
+                  return (
+                    <details
+                      key={m.id}
+                      className="sx-rail-mod"
+                      data-current={containsCurrent ? "true" : undefined}
+                      data-complete={moduleDone ? "true" : undefined}
+                      open={containsCurrent}
+                    >
+                      <summary>
+                        <span className="sx-rail-mod-num">
+                          {String(mi + 1).padStart(2, "0")}
+                        </span>
+                        <span className="sx-rail-mod-info">
+                          <span className="sx-rail-mod-title">{m.title}</span>
+                          <span className="sx-rail-mod-meta">
+                            {m.videos.length} lesson{m.videos.length === 1 ? "" : "s"}
+                            {formatDuration(totalSecs) ? ` · ${formatDuration(totalSecs)}` : ""}
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className="sx-rail-mod-chev"
+                          size={16}
+                          strokeWidth={2.4}
+                          aria-hidden="true"
+                        />
+                      </summary>
+                      <ol className="sx-rail-list">
+                        {m.videos.map((l, li) => (
+                          <TreeLesson
+                            key={l.id}
+                            lesson={l}
+                            index={li}
+                            isCurrent={l.id === current.videoId}
+                            progress={progressMap.get(l.id) ?? null}
+                            onNavigate={navigate}
+                          />
+                        ))}
+                      </ol>
+                    </details>
+                  );
+                })}
+              </div>
+            )}
+          </aside>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function TreeLesson({
+  lesson,
+  index,
+  isCurrent,
+  progress,
+  onNavigate,
+}: {
+  lesson: LessonNode;
+  index: number;
+  isCurrent: boolean;
+  progress: { lastTimestamp: number; completed: boolean } | null;
+  onNavigate: (id: string) => void;
+}) {
+  const completed = progress?.completed === true;
+  const ratio = completed
+    ? 1
+    : progress && lesson.duration && lesson.duration > 0
+      ? Math.min(1, progress.lastTimestamp / lesson.duration)
+      : 0;
+  return (
+    <li
+      data-current={isCurrent ? "true" : undefined}
+      data-completed={completed ? "true" : undefined}
+    >
+      <a
+        href={`/videos/${lesson.id}`}
+        className="sx-rail-row"
+        aria-current={isCurrent ? "true" : undefined}
+        onClick={(e) => {
+          // Let modified clicks (new tab) behave natively.
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+          e.preventDefault();
+          onNavigate(lesson.id);
+        }}
+      >
+        <span className="sx-rail-icon" aria-hidden="true">
+          {completed ? (
+            <Check size={11} strokeWidth={2.8} />
+          ) : isCurrent ? (
+            <span className="sx-rail-pulse" />
+          ) : (
+            <Play size={10} strokeWidth={2.4} fill="currentColor" />
+          )}
+        </span>
+        <span className="sx-rail-num">{String(index + 1).padStart(2, "0")}</span>
+        <span className="sx-rail-lesson">{lesson.title}</span>
+        <span className="sx-rail-dur">
+          {formatDuration(lesson.duration ?? 0) ?? "—"}
+        </span>
+        {ratio > 0 && ratio < 1 ? (
+          <span className="sx-rail-bar" aria-hidden="true">
+            <span style={{ width: `${ratio * 100}%` }} />
+          </span>
+        ) : null}
+      </a>
+    </li>
+  );
+}
+
+function NoteCard({ note }: { note: WatchNote }) {
+  return (
+    <article className="sx-note">
+      <div className="sx-note-head">
+        <span className="sx-note-kind">
+          <FileText size={11} aria-hidden="true" />
+          {note.kind}
+        </span>
+        <span className="sx-note-title">{note.title}</span>
+      </div>
+      <div className="sx-note-actions">
+        <a
+          className="sx-note-link"
+          href={note.viewHref}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Eye size={13} aria-hidden="true" />
+          View
+        </a>
+        {note.downloadHref ? (
+          <a
+            className="sx-note-link sx-note-link--download"
+            href={note.downloadHref}
+            target="_blank"
+            rel="noreferrer"
+            download={note.downloadName ?? true}
+          >
+            <Download size={13} aria-hidden="true" />
+            Download
+          </a>
+        ) : null}
+      </div>
+    </article>
+  );
+}

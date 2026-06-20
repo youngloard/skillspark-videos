@@ -1,0 +1,2785 @@
+/* ==========================================================================
+   SKILLSPARK — STUDENT EXPERIENCE
+   --------------------------------------------------------------------------
+   Self-contained stylesheet for every student-facing page (login, dashboard,
+   package, course, watch) plus the floating help chat. Loaded AFTER
+   globals.css; every class is namespaced `sx-` so none of the legacy rules
+   (or their !important patches) can reach in here, and nothing in here can
+   leak into the admin app.
+
+   Design language: "Evergreen Atelier"
+     · warm gallery-paper ground, espresso ink, evergreen accent
+     · Fraunces (display serif) + Schibsted Grotesk (UI)
+     · hairline borders, calm shadows, one ember highlight for "continue"
+     · hover states move ONLY transform / shadow / color — never layout
+   ========================================================================== */
+
+.sx-shell,
+.sx-auth {
+  /* ---- tokens ---------------------------------------------------------- */
+  --paper: #f3f1ea;
+  --paper-2: #ebe8df;
+  --card: #fdfcf8;
+  --card-2: #f6f4ed;
+  --ink: #1c1a15;
+  --ink-2: #4a463c;
+  --mute: #8b8678;
+  --line: rgba(28, 26, 21, 0.1);
+  --line-2: rgba(28, 26, 21, 0.18);
+  --ever: #20654a;
+  --ever-deep: #14442f;
+  --ever-soft: rgba(32, 101, 74, 0.08);
+  --leaf: #4ade80;
+  --ember: #bb5219;
+  --ember-soft: rgba(187, 82, 25, 0.09);
+  --shadow-1:
+    0 1px 2px rgba(28, 26, 21, 0.04),
+    0 6px 18px -10px rgba(28, 26, 21, 0.1);
+  --shadow-2:
+    0 2px 4px rgba(28, 26, 21, 0.05),
+    0 18px 40px -18px rgba(28, 26, 21, 0.2);
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  /* Near-fluid container: on phones/tablets/laptops the page fills the
+     viewport with only the gutter padding (same feel on every device);
+     the cap only engages on very wide monitors so lines stay readable. */
+  --wrap: 1760px;
+  --gutter: clamp(16px, 3vw, 48px);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-body:
+    "Schibsted Grotesk", "Plus Jakarta Sans", -apple-system, "Segoe UI",
+    sans-serif;
+
+  /* ---- ground ---------------------------------------------------------- */
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  letter-spacing: 0;
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(28, 26, 21, 0.25) transparent;
+}
+
+.sx-shell *,
+.sx-auth * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(28, 26, 21, 0.25) transparent;
+}
+
+.sx-shell ::selection,
+.sx-auth ::selection {
+  background: var(--ever);
+  color: #f6f4ec;
+}
+
+/* Paper grain — fixed, non-interactive, vanishingly subtle. */
+.sx-shell::before,
+.sx-auth::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.sx-shell > *,
+.sx-auth > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- typographic resets inside the scope -------------------------------- */
+.sx-shell h1,
+.sx-shell h2,
+.sx-shell h3,
+.sx-auth h1,
+.sx-auth h2,
+.sx-auth h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 560;
+  font-variation-settings: "opsz" 60;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.sx-shell p,
+.sx-auth p {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.sx-shell img,
+.sx-shell video,
+.sx-shell iframe {
+  display: block;
+  max-width: 100%;
+}
+
+.sx-shell a,
+.sx-auth a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Card-style anchors must not inherit the legacy `a { font-weight: 650 }`
+   from globals.css — children declare their own weights. */
+.sx-tile,
+.sx-resume,
+.sx-lesson,
+.sx-rail-row,
+.sx-brand {
+  font-weight: 400;
+}
+
+/* Legible scrollbars on light ground (globals.css paints white thumbs that
+   vanish on paper). WebKit ignores scrollbar-color when ::-webkit-scrollbar
+   rules exist globally, so re-declare them inside the scope. */
+.sx-shell ::-webkit-scrollbar-thumb,
+.sx-auth ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(28, 26, 21, 0.22);
+  background-clip: padding-box;
+}
+
+.sx-shell ::-webkit-scrollbar-thumb:hover,
+.sx-auth ::-webkit-scrollbar-thumb:hover {
+  background: rgba(28, 26, 21, 0.38);
+  background-clip: padding-box;
+}
+
+/* ==========================================================================
+   SHARED ATOMS
+   ========================================================================== */
+
+.sx-page {
+  width: min(100%, var(--wrap));
+  margin: 0 auto;
+  padding: clamp(20px, 2.5vw, 36px) var(--gutter) 88px;
+}
+
+.sx-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ever);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sx-eyebrow svg {
+  flex: 0 0 auto;
+}
+
+/* Buttons — one family, three voices. Identical border-box in every state:
+   hover/active only ever change color, transform and shadow. */
+.sx-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 46px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 11px 22px;
+  color: #f6f4ec;
+  background: var(--ink);
+  box-shadow: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.94rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    background-color 180ms var(--ease),
+    border-color 180ms var(--ease),
+    color 180ms var(--ease),
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease);
+}
+
+.sx-btn:hover {
+  background: var(--ever-deep);
+  border-color: var(--ever-deep);
+  color: #f6f4ec;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-1);
+  text-decoration: none;
+}
+
+.sx-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+  transition-duration: 70ms;
+}
+
+.sx-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+  box-shadow: none;
+}
+
+.sx-btn:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 3px;
+}
+
+.sx-btn--ghost {
+  border-color: var(--line-2);
+  color: var(--ink-2);
+  background: transparent;
+}
+
+.sx-btn--ghost:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--card);
+}
+
+.sx-btn--sm {
+  min-height: 38px;
+  padding: 7px 16px;
+  font-size: 0.86rem;
+}
+
+/* Light button for dark overlays (player "up next" card). */
+.sx-btn--paper {
+  border-color: #f6f4ec;
+  color: var(--ink);
+  background: #f6f4ec;
+}
+
+.sx-btn--paper:hover {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.sx-btn--ghost-dark {
+  border-color: rgba(246, 244, 236, 0.4);
+  color: rgba(246, 244, 236, 0.9);
+  background: transparent;
+}
+
+.sx-btn--ghost-dark:hover {
+  border-color: #f6f4ec;
+  color: #ffffff;
+  background: rgba(246, 244, 236, 0.1);
+}
+
+/* Back link */
+.sx-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 14px 5px 11px;
+  color: var(--ink-2);
+  background: var(--card);
+  font-size: 0.83rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    transform 160ms var(--ease);
+}
+
+.sx-back svg {
+  transition: transform 160ms var(--ease);
+}
+
+.sx-back:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+  text-decoration: none;
+}
+
+.sx-back:hover svg {
+  transform: translateX(-2px);
+}
+
+.sx-back:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 2px;
+}
+
+/* Section header */
+.sx-row {
+  margin-top: clamp(36px, 5vw, 56px);
+}
+
+.sx-rowhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.sx-rowhead h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+}
+
+.sx-rowhead-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sx-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 11px;
+  color: var(--ink-2);
+  background: var(--card);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Empty states */
+.sx-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-lg);
+  padding: clamp(28px, 4vw, 44px);
+  background: var(--card);
+}
+
+.sx-empty svg {
+  color: var(--ever);
+}
+
+.sx-empty h3 {
+  font-size: 1.25rem;
+}
+
+.sx-empty-note {
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  padding: 22px 24px;
+  color: var(--mute);
+  background: var(--card);
+  font-size: 0.95rem;
+}
+
+/* ==========================================================================
+   TOPBAR
+   ========================================================================== */
+
+.sx-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--line);
+  background: rgba(243, 241, 234, 0.86);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+
+.sx-topbar-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, var(--wrap));
+  margin: 0 auto;
+  padding: 12px var(--gutter);
+}
+
+.sx-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.sx-brand:hover {
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.sx-brand:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.sx-brand-mark {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: #f6f4ec;
+  background: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.sx-brand-mark::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--leaf);
+}
+
+.sx-brand-text {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.sx-brand-text strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.06rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.sx-brand-text span {
+  color: var(--mute);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sx-topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.sx-access-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 14px;
+  color: var(--ink-2);
+  background: var(--card);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sx-access-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--leaf);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.22);
+}
+
+.sx-signout {
+  min-height: 36px;
+  padding: 5px 16px;
+  font-size: 0.83rem;
+}
+
+/* ==========================================================================
+   PAGE-LOAD REVEAL  (one orchestrated moment, then everything is still)
+   ========================================================================== */
+
+@keyframes sx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sx-page > * {
+  animation: sx-rise 480ms var(--ease) both;
+}
+
+.sx-page > *:nth-child(2) { animation-delay: 60ms; }
+.sx-page > *:nth-child(3) { animation-delay: 120ms; }
+.sx-page > *:nth-child(4) { animation-delay: 180ms; }
+.sx-page > *:nth-child(5) { animation-delay: 240ms; }
+.sx-page > *:nth-child(n + 6) { animation-delay: 280ms; }
+
+/* ==========================================================================
+   DASHBOARD — HERO + RESUME
+   ========================================================================== */
+
+.sx-hero {
+  display: grid;
+  /* Resume card is capped so it doesn't balloon on wide monitors —
+     the greeting column absorbs the extra width instead. */
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 560px);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: center;
+  padding-top: clamp(12px, 2.5vw, 28px);
+}
+
+.sx-hero-text {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.sx-hero h1 {
+  font-size: clamp(2.1rem, 5vw, 3.3rem);
+  font-weight: 540;
+}
+
+.sx-hero-name {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ever);
+}
+
+.sx-hero-text > p {
+  font-size: 1.02rem;
+  max-width: 46ch;
+}
+
+.sx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.sx-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 15px;
+  background: var(--card);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.sx-chip svg {
+  align-self: center;
+  color: var(--ever);
+}
+
+.sx-chip strong {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-chip small {
+  color: var(--mute);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Resume card — the one warm (ember) object on the page. */
+.sx-resume {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease),
+    border-color 220ms var(--ease);
+}
+
+a.sx-resume:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+a.sx-resume:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 3px;
+}
+
+.sx-resume-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 148px;
+  background:
+    radial-gradient(140% 120% at 0% 0%, #33302a 0%, var(--ink) 70%);
+  overflow: hidden;
+}
+
+.sx-resume-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    rgba(246, 244, 236, 0.14) 1px,
+    transparent 1.4px
+  );
+  background-size: 14px 14px;
+  mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.9), transparent 70%);
+  -webkit-mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.9), transparent 70%);
+}
+
+.sx-resume-play {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: #f6f4ec;
+  box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.6);
+  transition: transform 220ms var(--ease), background-color 220ms var(--ease);
+}
+
+.sx-resume-play svg {
+  margin-left: 3px;
+}
+
+.sx-resume-play--idle {
+  color: #f6f4ec;
+  background: rgba(246, 244, 236, 0.12);
+  border: 1px solid rgba(246, 244, 236, 0.3);
+  box-shadow: none;
+}
+
+.sx-resume-play--idle svg {
+  margin-left: 0;
+}
+
+a.sx-resume:hover .sx-resume-play {
+  transform: scale(1.08);
+  background: #ffffff;
+}
+
+.sx-resume-body {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  min-width: 0;
+  padding: 18px 20px;
+}
+
+.sx-resume-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ember);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sx-resume-title {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sx-resume-context {
+  color: var(--mute);
+  font-size: 0.83rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sx-resume-meter {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.sx-resume-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.sx-resume-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ever), var(--leaf));
+}
+
+.sx-resume-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--mute);
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-resume-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- stats band ---------------------------------------------------------- */
+
+.sx-statband {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: clamp(28px, 4vw, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.sx-stat {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: clamp(16px, 2.5vw, 26px) clamp(16px, 2.5vw, 28px);
+  border-left: 1px solid var(--line);
+}
+
+.sx-stat:first-child {
+  border-left: 0;
+}
+
+.sx-stat-label {
+  color: var(--mute);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sx-stat-value {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3.4vw, 2.5rem);
+  font-weight: 560;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-stat[data-tone="green"] .sx-stat-value { color: var(--ever); }
+.sx-stat[data-tone="amber"] .sx-stat-value { color: var(--ember); }
+
+.sx-stat-hint {
+  color: var(--mute);
+  font-size: 0.8rem;
+}
+
+/* ==========================================================================
+   TILE GRID  (packages + courses)
+   ========================================================================== */
+
+.sx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: clamp(14px, 2vw, 20px);
+}
+
+.sx-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease),
+    border-color 220ms var(--ease);
+}
+
+.sx-tile:hover {
+  transform: translateY(-4px);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.sx-tile:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 3px;
+}
+
+.sx-tile-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+/* Muted duotone plates per tone — calm, gallery-like. */
+.sx-tile[data-tone="violet"] .sx-tile-cover { background: #e4e0ee; color: #4f4470; }
+.sx-tile[data-tone="cyan"]   .sx-tile-cover { background: #dbe8e0; color: #2c5a44; }
+.sx-tile[data-tone="rose"]   .sx-tile-cover { background: #ecdcd6; color: #7c4434; }
+.sx-tile[data-tone="blue"]   .sx-tile-cover { background: #dde4ea; color: #38536b; }
+.sx-tile[data-tone="amber"]  .sx-tile-cover { background: #ecdfc6; color: #7a5a1e; }
+
+.sx-tile-monogram {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5vw, 3.4rem);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+  user-select: none;
+}
+
+.sx-tile-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 400ms var(--ease);
+}
+
+.sx-tile:hover .sx-tile-image {
+  transform: scale(1.04);
+}
+
+.sx-tile-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #f6f4ec;
+  background: rgba(28, 26, 21, 0.82);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sx-tile-body {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  flex: 1 1 auto;
+  padding: 16px 18px 18px;
+}
+
+.sx-tile-title {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.13rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.sx-tile-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ever);
+  font-size: 0.79rem;
+  font-weight: 700;
+}
+
+.sx-tile-body p {
+  color: var(--mute);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   COURSE / PACKAGE HERO
+   ========================================================================== */
+
+.sx-pagehero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: start;
+  padding-top: clamp(10px, 2vw, 22px);
+}
+
+.sx-pagehero-main {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.sx-pagehero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.sx-pagehero h1 {
+  font-size: clamp(1.9rem, 4.2vw, 2.9rem);
+}
+
+.sx-pagehero-main > p {
+  font-size: 1rem;
+  max-width: 56ch;
+}
+
+/* Progress card */
+.sx-progress {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 22px 24px;
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+}
+
+.sx-progress::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 24px;
+  width: 48px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--ever);
+}
+
+.sx-progress-tag {
+  color: var(--mute);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sx-progress-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sx-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 13px;
+  color: var(--ink-2);
+  background: var(--card-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-fact svg {
+  color: var(--ever);
+}
+
+.sx-meter {
+  display: grid;
+  gap: 8px;
+}
+
+.sx-meter-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+
+.sx-meter-label strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sx-meter-count {
+  margin-left: auto;
+  color: var(--mute);
+  font-size: 0.79rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.sx-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ever), var(--leaf));
+  transition: width 600ms var(--ease);
+}
+
+.sx-access-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mute);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-access-note svg {
+  color: var(--ever);
+}
+
+.sx-access-note strong {
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   LESSON LIST
+   ========================================================================== */
+
+.sx-lessons {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.sx-lessons > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.sx-lesson {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px 34px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 12px clamp(14px, 2.5vw, 22px);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 160ms var(--ease);
+}
+
+.sx-lesson::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: transparent;
+  transition: background-color 160ms var(--ease);
+}
+
+.sx-lesson:hover {
+  background: var(--card-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.sx-lesson:hover::before {
+  background: var(--ever);
+}
+
+.sx-lesson:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: -2px;
+}
+
+.sx-lesson[data-continue="true"] {
+  background: var(--ember-soft);
+}
+
+.sx-lesson[data-continue="true"]::before {
+  background: var(--ember);
+}
+
+/* play disc + progress ring */
+.sx-lesson-disc {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+
+.sx-ring {
+  position: absolute;
+  inset: 0;
+}
+
+.sx-ring-track {
+  stroke: var(--line);
+}
+
+.sx-ring-arc {
+  stroke: var(--ever);
+  transition: stroke-dashoffset 400ms var(--ease);
+}
+
+.sx-ring-arc[data-complete="true"] {
+  stroke: var(--leaf);
+}
+
+.sx-lesson-play {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--paper-2);
+  transition:
+    background-color 160ms var(--ease),
+    color 160ms var(--ease),
+    transform 160ms var(--ease);
+}
+
+.sx-lesson-play svg {
+  margin-left: 1px;
+}
+
+.sx-lesson[data-completed="true"] .sx-lesson-play {
+  color: #ffffff;
+  background: var(--ever);
+}
+
+.sx-lesson[data-completed="true"] .sx-lesson-play svg {
+  margin-left: 0;
+}
+
+.sx-lesson:hover .sx-lesson-play {
+  color: #f6f4ec;
+  background: var(--ink);
+  transform: scale(1.06);
+}
+
+.sx-lesson-num {
+  color: var(--mute);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-style: italic;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.sx-lesson-titles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.sx-lesson-title {
+  color: var(--ink);
+  font-size: 0.97rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sx-lesson[data-completed="true"] .sx-lesson-title {
+  color: var(--mute);
+  font-weight: 500;
+}
+
+.sx-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sx-pill--continue {
+  color: #ffffff;
+  background: var(--ember);
+}
+
+.sx-pill--done {
+  color: var(--ever);
+  background: var(--ever-soft);
+}
+
+.sx-pill--progress {
+  color: var(--ink-2);
+  background: var(--paper-2);
+}
+
+.sx-lesson-dur {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--mute);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sx-lesson-arrow {
+  color: var(--mute);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+}
+
+.sx-lesson:hover .sx-lesson-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ==========================================================================
+   MODULE ACCORDION
+   ========================================================================== */
+
+.sx-mod {
+  margin-top: clamp(18px, 2.5vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.sx-mod-summary {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: clamp(16px, 2.5vw, 22px) clamp(16px, 2.5vw, 24px);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background-color 160ms var(--ease);
+}
+
+.sx-mod-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sx-mod-summary:hover {
+  background: var(--card-2);
+}
+
+.sx-mod-summary:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: -2px;
+}
+
+.sx-mod-index {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--card);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-style: italic;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-mod-index[data-complete="true"] {
+  color: #ffffff;
+  border-color: var(--ever);
+  background: var(--ever);
+}
+
+.sx-mod-titles {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sx-mod-title {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.08rem, 1.8vw, 1.3rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.sx-mod-desc {
+  color: var(--mute);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sx-mod-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sx-mod-chev {
+  color: var(--mute);
+  transition: transform 240ms var(--ease);
+}
+
+.sx-mod[open] .sx-mod-chev {
+  transform: rotate(180deg);
+}
+
+.sx-mod-body {
+  padding: 0 clamp(16px, 2.5vw, 24px) clamp(16px, 2.5vw, 24px);
+  animation: sx-rise 320ms var(--ease) both;
+}
+
+.sx-mod-body .sx-lessons {
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   WATCH PAGE
+   ========================================================================== */
+
+.sx-watch {
+  width: min(100%, var(--wrap));
+  margin: 0 auto;
+  padding: clamp(16px, 2vw, 28px) var(--gutter) 88px;
+}
+
+.sx-watch > .sx-back {
+  margin-bottom: 16px;
+}
+
+.sx-watch > * {
+  animation: sx-rise 480ms var(--ease) both;
+}
+
+.sx-watch > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.sx-watch-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 28vw, 372px);
+  gap: clamp(18px, 2.5vw, 28px);
+  align-items: start;
+  transition: opacity 200ms var(--ease);
+}
+
+/* During an in-place lesson swap we no longer dim the whole grid (that read as
+   a full-page reload flash) and we add no overlay — the player's own native
+   loading UI handles the buffer. We only lock the rail so a second click can't
+   kick off a competing navigation. */
+.sx-watch-grid[data-pending="true"] .sx-rail {
+  pointer-events: none;
+}
+
+.sx-watch-main {
+  display: grid;
+  gap: clamp(18px, 2.5vw, 26px);
+  min-width: 0;
+}
+
+/* Player frame */
+.sx-player {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+  background: #0c0b09;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 24px 60px -24px rgba(28, 26, 21, 0.45);
+  overflow: hidden;
+}
+
+.sx-player video,
+.sx-player iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0c0b09;
+}
+
+/* Edge prev/next — calm circular controls, auto-hidden by the player after
+   a few seconds of playback.
+
+   IMPORTANT: the global brutalist button theme (globals.css) forces transform,
+   background, border, border-radius and a green offset box-shadow on EVERY
+   `button` / `button:hover` / `button:active` with `!important`. Its
+   `button:hover` (0,1,1) outranks a bare `.sx-player-edge` (0,1,0), so we must
+   re-pin every conflicting property with `!important` on each individual state
+   to keep these controls round, shadow-free and perfectly stationary. */
+.sx-player-edge {
+  position: absolute;
+  top: 50%;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  min-height: 0;
+  padding: 0 !important;
+  border: 1px solid rgba(246, 244, 236, 0.18) !important;
+  border-radius: 999px !important;
+  color: #f6f4ec !important;
+  background: rgba(12, 11, 9, 0.62) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  transform: translateY(-50%) !important;
+  transition:
+    opacity 220ms var(--ease),
+    background-color 150ms var(--ease),
+    border-color 150ms var(--ease),
+    visibility 220ms !important;
+}
+
+.sx-player-edge:hover {
+  background: rgba(12, 11, 9, 0.9) !important;
+  border-color: rgba(246, 244, 236, 0.45) !important;
+  color: #ffffff !important;
+  transform: translateY(-50%) !important;
+  box-shadow: none !important;
+}
+
+.sx-player-edge:active {
+  background: rgba(12, 11, 9, 0.96) !important;
+  transform: translateY(-50%) !important;
+  box-shadow: none !important;
+}
+
+.sx-player-edge:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+  transform: translateY(-50%) !important;
+}
+
+.sx-player-edge--prev {
+  left: 14px;
+}
+
+.sx-player-edge--next {
+  right: 14px;
+}
+
+.sx-player[data-chrome-visible="false"] .sx-player-edge,
+.sx-player[data-chrome-visible="false"] .sx-ctls {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Netflix-style center cluster: rewind 10s · play/pause · forward 10s.
+   The wrapper passes pointer events through to the native control bar; only the
+   buttons themselves are interactive. Transforms are pinned !important on every
+   state so the global `button:hover` lift can never make them drift. */
+.sx-ctls {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 6vw, 52px);
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none;
+  transition: opacity 220ms var(--ease), visibility 220ms;
+}
+
+.sx-ctl {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0 !important;
+  color: #f6f4ec !important;
+  background: rgba(12, 11, 9, 0.5) !important;
+  border: 1px solid rgba(246, 244, 236, 0.16) !important;
+  border-radius: 999px !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: none !important;
+  transform: none !important;
+  transition:
+    opacity 180ms var(--ease),
+    background-color 150ms var(--ease),
+    border-color 150ms var(--ease) !important;
+}
+
+.sx-ctl--skip {
+  width: 54px;
+  height: 54px;
+}
+
+.sx-ctl--play {
+  width: 72px;
+  height: 72px;
+  background: rgba(12, 11, 9, 0.62) !important;
+}
+
+.sx-ctl:hover {
+  background: rgba(12, 11, 9, 0.82) !important;
+  border-color: rgba(246, 244, 236, 0.4) !important;
+  color: #ffffff !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.sx-ctl:active {
+  background: rgba(12, 11, 9, 0.95) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.sx-ctl:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+  transform: none !important;
+}
+
+/* The "10" label tucked under the circular-arrow skip icons. */
+.sx-ctl-sec {
+  position: absolute;
+  top: 52%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.64rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* Suppress the browser's own big center play overlay so it can't double up
+   with our custom play button. The bottom control bar stays (scrubber, volume,
+   fullscreen). */
+.sx-player video::-webkit-media-controls-overlay-play-button {
+  display: none;
+}
+
+/* Up-next countdown overlay */
+.sx-nextup {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  background: rgba(12, 11, 9, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: sx-rise 280ms var(--ease) both;
+}
+
+.sx-nextup-label {
+  color: rgba(246, 244, 236, 0.7);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sx-nextup-count {
+  color: #f6f4ec;
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 560;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-nextup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Video info */
+.sx-watch-info {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.sx-watch-info h1 {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+.sx-watch-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  color: var(--mute);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-watch-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sx-watch-resume {
+  color: var(--ever);
+}
+
+.sx-note-banner {
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  color: var(--mute);
+  background: var(--card);
+  font-size: 0.85rem;
+}
+
+/* Notes */
+.sx-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.sx-note {
+  display: grid;
+  gap: 12px;
+  align-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+}
+
+.sx-note:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-2);
+}
+
+.sx-note-head {
+  display: grid;
+  gap: 7px;
+  justify-items: start;
+}
+
+.sx-note-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--ever);
+  background: var(--ever-soft);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sx-note-title {
+  color: var(--ink);
+  font-size: 0.94rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.sx-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sx-note-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 6px 14px;
+  color: var(--ink-2);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    background-color 160ms var(--ease);
+}
+
+.sx-note-link:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--card-2);
+  text-decoration: none;
+}
+
+.sx-note-link--download {
+  color: var(--ever);
+  border-color: rgba(32, 101, 74, 0.35);
+}
+
+.sx-note-link--download:hover {
+  color: #ffffff;
+  border-color: var(--ever);
+  background: var(--ever);
+}
+
+.sx-note-link:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 2px;
+}
+
+/* Course rail (right sidebar) */
+.sx-rail {
+  position: sticky;
+  top: 78px;
+  display: grid;
+  gap: 0;
+  max-height: calc(100dvh - 96px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+.sx-rail-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 18px;
+  background: var(--card);
+}
+
+.sx-rail-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sx-rail-title {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.sx-rail-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sx-rail-list > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.sx-rail-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 16px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 150ms var(--ease);
+}
+
+.sx-rail-row:hover {
+  background: var(--card-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.sx-rail-row:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: -2px;
+}
+
+.sx-rail-list li[data-current="true"] .sx-rail-row {
+  background: var(--ever-soft);
+}
+
+.sx-rail-list li[data-current="true"] .sx-rail-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--ever);
+}
+
+.sx-rail-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: var(--mute);
+  background: var(--paper-2);
+}
+
+.sx-rail-icon svg {
+  margin-left: 1px;
+}
+
+.sx-rail-list li[data-completed="true"] .sx-rail-icon {
+  color: #ffffff;
+  background: var(--ever);
+}
+
+.sx-rail-list li[data-completed="true"] .sx-rail-icon svg {
+  margin-left: 0;
+}
+
+.sx-rail-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ever);
+  animation: sx-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sx-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(32, 101, 74, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(32, 101, 74, 0); }
+}
+
+.sx-rail-num {
+  color: var(--mute);
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-rail-lesson {
+  color: var(--ink-2);
+  font-size: 0.87rem;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sx-rail-list li[data-current="true"] .sx-rail-lesson {
+  color: var(--ink);
+}
+
+.sx-rail-list li[data-completed="true"] .sx-rail-lesson {
+  color: var(--mute);
+  font-weight: 500;
+}
+
+.sx-rail-dur {
+  color: var(--mute);
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-rail-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+}
+
+.sx-rail-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ever);
+}
+
+/* Rail modules (modular courses) */
+.sx-rail-mods {
+  display: grid;
+}
+
+.sx-rail-mod + .sx-rail-mod {
+  border-top: 1px solid var(--line);
+}
+
+.sx-rail-mod > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background-color 150ms var(--ease);
+}
+
+.sx-rail-mod > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sx-rail-mod > summary:hover {
+  background: var(--card-2);
+}
+
+.sx-rail-mod > summary:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: -2px;
+}
+
+.sx-rail-mod[data-current="true"] > summary {
+  background: var(--ever-soft);
+}
+
+.sx-rail-mod-num {
+  color: var(--mute);
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-rail-mod[data-complete="true"] .sx-rail-mod-num {
+  color: var(--ever);
+}
+
+.sx-rail-mod-info {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sx-rail-mod-title {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.sx-rail-mod-meta {
+  color: var(--mute);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-rail-mod-chev {
+  color: var(--mute);
+  transition: transform 220ms var(--ease);
+}
+
+.sx-rail-mod[open] > summary .sx-rail-mod-chev {
+  transform: rotate(180deg);
+}
+
+.sx-rail-mod > .sx-rail-list {
+  border-top: 1px solid var(--line);
+  background: var(--card-2);
+}
+
+.sx-rail-mod .sx-rail-row {
+  padding-left: 22px;
+}
+
+/* ==========================================================================
+   LOGIN
+   ========================================================================== */
+
+.sx-auth {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: clamp(16px, 4vw, 48px);
+}
+
+.sx-auth-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 440px);
+  width: min(100%, 1020px);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--card);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+/* Story panel — deep ink, serif statement, quiet texture. */
+.sx-auth-story {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  min-height: 520px;
+  padding: clamp(28px, 4.5vw, 52px);
+  color: #f6f4ec;
+  background:
+    radial-gradient(120% 130% at 85% -10%, #2e3d31 0%, transparent 55%),
+    radial-gradient(130% 120% at -10% 110%, #232019 0%, transparent 60%),
+    #15130f;
+  overflow: hidden;
+}
+
+.sx-auth-story::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    rgba(246, 244, 236, 0.1) 1px,
+    transparent 1.4px
+  );
+  background-size: 22px 22px;
+  mask-image: radial-gradient(120% 90% at 80% 10%, rgba(0, 0, 0, 0.8), transparent 65%);
+  -webkit-mask-image: radial-gradient(120% 90% at 80% 10%, rgba(0, 0, 0, 0.8), transparent 65%);
+  pointer-events: none;
+}
+
+.sx-auth-story > * {
+  position: relative;
+}
+
+.sx-auth-story-top {
+  display: grid;
+  gap: 22px;
+  justify-items: start;
+}
+
+.sx-auth-story .sx-eyebrow {
+  color: var(--leaf);
+}
+
+.sx-auth-story h1 {
+  color: #f6f4ec;
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+}
+
+.sx-auth-story h1 em {
+  font-style: italic;
+  color: var(--leaf);
+}
+
+.sx-auth-story > .sx-auth-story-top > p {
+  max-width: 38ch;
+  color: rgba(246, 244, 236, 0.72);
+  font-size: 1rem;
+}
+
+.sx-auth-points {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sx-auth-points li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: rgba(246, 244, 236, 0.82);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.sx-auth-points svg {
+  flex: 0 0 auto;
+  color: var(--leaf);
+}
+
+/* Form panel */
+.sx-auth-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  padding: clamp(28px, 4.5vw, 52px);
+  background: var(--card);
+}
+
+.sx-auth-form-head {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.sx-auth-form h2 {
+  font-size: clamp(1.6rem, 3vw, 2rem);
+}
+
+.sx-auth-form-head p {
+  color: var(--mute);
+  font-size: 0.92rem;
+}
+
+.sx-auth-form form {
+  display: grid;
+  margin: 0;
+}
+
+.sx-auth-form .sx-btn {
+  width: 100%;
+  min-height: 52px;
+}
+
+.sx-google-g {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.sx-auth-user {
+  display: grid;
+  gap: 14px;
+}
+
+.sx-auth-user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 13px 16px;
+  background: var(--card-2);
+}
+
+.sx-auth-user-card svg {
+  flex: 0 0 auto;
+  color: var(--ever);
+}
+
+.sx-auth-user-card > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sx-auth-user-card strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sx-auth-user-card small {
+  color: var(--mute);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sx-alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid rgba(180, 50, 40, 0.3);
+  border-radius: var(--r-md);
+  padding: 13px 16px;
+  color: #8c2e24;
+  background: rgba(180, 50, 40, 0.07);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.sx-alert strong {
+  color: inherit;
+}
+
+.sx-auth-foot {
+  color: var(--mute);
+  font-size: 0.8rem;
+}
+
+/* ==========================================================================
+   HELP CHAT WIDGET
+   ========================================================================== */
+
+.sx-chat-fab {
+  position: fixed;
+  right: clamp(16px, 3vw, 28px);
+  bottom: clamp(16px, 3vw, 28px);
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0;
+  color: #f6f4ec;
+  background: var(--ink);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease),
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease);
+}
+
+.sx-chat-fab:hover {
+  background: var(--ever-deep);
+  border-color: var(--ever-deep);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+
+.sx-chat-fab:active {
+  transform: scale(0.95);
+  box-shadow: var(--shadow-1);
+}
+
+.sx-chat-fab:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 3px;
+}
+
+.sx-chat {
+  position: fixed;
+  right: clamp(16px, 3vw, 28px);
+  bottom: calc(clamp(16px, 3vw, 28px) + 68px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  height: min(520px, calc(100dvh - 140px));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  animation: sx-rise 260ms var(--ease) both;
+}
+
+.sx-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 18px;
+  background: var(--card-2);
+}
+
+.sx-chat-head strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sx-chat-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0;
+  color: var(--ink-2);
+  background: var(--card);
+  box-shadow: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition:
+    color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    background-color 160ms var(--ease);
+}
+
+.sx-chat-close:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+  background: var(--card-2);
+  transform: none;
+  box-shadow: none;
+}
+
+.sx-chat-close:active {
+  transform: scale(0.94);
+  box-shadow: none;
+}
+
+.sx-chat-close:focus-visible {
+  outline: 2px solid var(--ever);
+  outline-offset: 2px;
+}
+
+.sx-chat-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sx-chat-msg {
+  max-width: 85%;
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.sx-chat-msg--bot {
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 6px;
+  color: var(--ink-2);
+  background: var(--card-2);
+}
+
+.sx-chat-msg--user {
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+  color: #f6f4ec;
+  background: var(--ink);
+}
+
+.sx-chat-msg--error {
+  align-self: flex-start;
+  border: 1px solid rgba(180, 50, 40, 0.3);
+  color: #8c2e24;
+  background: rgba(180, 50, 40, 0.07);
+}
+
+.sx-chat-form {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 12px;
+  background: var(--card);
+}
+
+.sx-chat-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 9px 16px;
+  color: var(--ink);
+  background: var(--card-2);
+  box-shadow: none;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+
+.sx-chat-form input::placeholder {
+  color: var(--mute);
+}
+
+.sx-chat-form input:hover {
+  border-color: var(--line-2);
+}
+
+.sx-chat-form input:focus,
+.sx-chat-form input:focus-visible {
+  border-color: var(--ever);
+  background: var(--card);
+  box-shadow: 0 0 0 3px rgba(32, 101, 74, 0.15);
+  outline: none;
+}
+
+.sx-chat-form .sx-btn {
+  min-height: 44px;
+  padding: 9px 18px;
+}
+
+/* ==========================================================================
+   SKELETONS
+   ========================================================================== */
+
+@keyframes sx-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.sx-skel {
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      100deg,
+      var(--paper-2) 40%,
+      rgba(255, 255, 255, 0.75) 50%,
+      var(--paper-2) 60%
+    );
+  background-size: 200% 100%;
+  animation: sx-shimmer 1.6s linear infinite;
+}
+
+.sx-skel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, var(--wrap));
+  margin: 0 auto;
+  padding: 12px var(--gutter);
+  border-bottom: 1px solid var(--line);
+}
+
+.sx-skel--brand { width: 170px; height: 38px; }
+.sx-skel--pill { width: 150px; height: 36px; border-radius: 999px; }
+.sx-skel--back { width: 110px; }
+.sx-skel--eyebrow { width: 120px; height: 14px; }
+.sx-skel--title { width: min(50%, 360px); height: 30px; }
+.sx-skel--title-lg { width: min(70%, 480px); height: 46px; }
+.sx-skel--par { width: min(90%, 560px); height: 16px; }
+.sx-skel--row { height: 64px; border-radius: var(--r-md); }
+.sx-skel--tile { aspect-ratio: 4 / 3.4; border-radius: var(--r-lg); }
+.sx-skel--player {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+}
+
+.sx-skel-page {
+  display: grid;
+  gap: 16px;
+  width: min(100%, var(--wrap));
+  margin: 0 auto;
+  padding: clamp(20px, 2.5vw, 36px) var(--gutter) 88px;
+}
+
+.sx-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: clamp(14px, 2vw, 20px);
+  margin-top: 10px;
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 1080px) {
+  .sx-watch-grid {
+    grid-template-columns: 1fr;
+  }
+  .sx-rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .sx-rail-head {
+    position: static;
+  }
+}
+
+@media (max-width: 960px) {
+  .sx-hero {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .sx-resume {
+    max-width: 560px;
+  }
+  .sx-pagehero {
+    grid-template-columns: 1fr;
+  }
+  .sx-progress {
+    max-width: 560px;
+  }
+}
+
+@media (max-width: 880px) {
+  .sx-auth-card {
+    grid-template-columns: 1fr;
+    width: min(100%, 560px);
+  }
+  .sx-auth-story {
+    min-height: 0;
+    gap: 26px;
+  }
+  .sx-auth-points {
+    display: none;
+  }
+  .sx-auth-story h1 {
+    font-size: clamp(2.1rem, 8vw, 2.8rem);
+  }
+}
+
+@media (max-width: 720px) {
+  .sx-statband {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sx-stat {
+    border-left: 0;
+  }
+  .sx-stat:nth-child(even) {
+    border-left: 1px solid var(--line);
+  }
+  .sx-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 640px) {
+  .sx-brand-text span {
+    display: none;
+  }
+  .sx-grid {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .sx-lesson {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .sx-lesson-num,
+  .sx-lesson-arrow {
+    display: none;
+  }
+  .sx-resume {
+    grid-template-columns: 1fr;
+  }
+  .sx-resume-cover {
+    min-height: 120px;
+  }
+  .sx-mod-summary {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .sx-mod-index {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    font-size: 0.92rem;
+  }
+  .sx-mod-meta .sx-count {
+    display: none;
+  }
+  .sx-rowhead h2 {
+    font-size: 1.3rem;
+  }
+  .sx-grid {
+    grid-template-columns: 1fr;
+  }
+  .sx-chat {
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .sx-access-chip {
+    display: none;
+  }
+  .sx-chips .sx-chip small {
+    display: none;
+  }
+  .sx-player,
+  .sx-skel--player {
+    border-radius: 12px;
+  }
+  .sx-nextup-actions .sx-btn {
+    min-height: 42px;
+    padding: 8px 16px;
+    font-size: 0.86rem;
+  }
+}
+
+/* Coarse pointers: kill lifts (they smear on touch scroll), keep press
+   feedback, and enforce comfortable hit areas. */
+@media (hover: none) {
+  .sx-tile:hover,
+  a.sx-resume:hover,
+  .sx-btn:hover,
+  .sx-chat-fab:hover {
+    transform: none;
+    box-shadow: var(--shadow-1);
+  }
+  .sx-tile:active,
+  a.sx-resume:active {
+    transform: scale(0.99);
+  }
+  .sx-player-edge {
+    width: 42px;
+    height: 58px;
+  }
+}
+
+@media (pointer: coarse) {
+  .sx-back,
+  .sx-note-link,
+  .sx-signout,
+  .sx-access-chip {
+    min-height: 44px;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-shell *,
+  .sx-auth *,
+  .sx-chat,
+  .sx-nextup {
+    animation: none !important;
+    transition-duration: 1ms !important;
+  }
+  .sx-page > *,
+  .sx-mod-body {
+    animation: none !important;
+  }
+  .sx-rail-pulse {
+    animation: none !important;
+    box-shadow: 0 0 0 3px rgba(32, 101, 74, 0.2);
+  }
+}

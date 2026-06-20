@@ -1,0 +1,21 @@
+node_modules
+.next
+out
+dist
+.env
+.env.local
+*.db
+*.db-journal
+prisma/dev.db
+prisma/migrations/dev.db
+public/uploads/
+.DS_Store
+.vscode
+*.tsbuildinfo
+next-dev.*.log
+
+# Data migration dump — contains real user emails / audit data. Never commit.
+scripts/data-dump.json
+
+# Claude Code local config
+.claude
