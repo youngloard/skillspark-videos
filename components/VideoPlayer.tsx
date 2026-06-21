@@ -118,6 +118,10 @@ export default function VideoPlayer({
   // Controls the visibility of all overlay chrome (edge nav + center cluster).
   const [chromeVisible, setChromeVisible] = useState(true);
   const [playing, setPlaying] = useState(false);
+  // Starts true so the spinner is on screen the instant the element mounts
+  // (i.e. the moment a lesson swap remounts the player), before any byte lands.
+  const [buffering, setBuffering] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const cancelRef = useRef(false);
 
   const togglePlay = useCallback(() => {
@@ -252,6 +256,60 @@ export default function VideoPlayer({
       }
     };
   }, [videoId, streaming, initialTimestamp]);
+
+  // -- Buffering / error overlay (streaming only) --------------------------
+  // A bare <video> renders only a black rectangle while it connects to the
+  // proxy and buffers, which reads as "my click did nothing." Drive a real
+  // spinner off the element's own readiness events so a lesson swap always
+  // shows it is loading, and surface a retry on hard failures (e.g. proxy 503).
+  useEffect(() => {
+    if (!streaming) {
+      setBuffering(false);
+      return;
+    }
+    const v = videoRef.current;
+    if (!v) return;
+    setLoadError(false);
+    const ready = () => setBuffering(false);
+    const wait = () => setBuffering(true);
+    const fail = () => {
+      setLoadError(true);
+      setBuffering(false);
+    };
+    v.addEventListener("loadeddata", ready);
+    v.addEventListener("canplay", ready);
+    v.addEventListener("playing", ready);
+    v.addEventListener("seeked", ready);
+    v.addEventListener("waiting", wait);
+    v.addEventListener("seeking", wait);
+    v.addEventListener("stalled", wait);
+    v.addEventListener("error", fail);
+    // The element may already have buffered enough by the time we attach
+    // (fast reconnect / cached range) — reconcile instead of flashing a spinner.
+    setBuffering(v.readyState < 3 /* HAVE_FUTURE_DATA */);
+    return () => {
+      v.removeEventListener("loadeddata", ready);
+      v.removeEventListener("canplay", ready);
+      v.removeEventListener("playing", ready);
+      v.removeEventListener("seeked", ready);
+      v.removeEventListener("waiting", wait);
+      v.removeEventListener("seeking", wait);
+      v.removeEventListener("stalled", wait);
+      v.removeEventListener("error", fail);
+    };
+  }, [videoId, streaming]);
+
+  const retry = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    setLoadError(false);
+    setBuffering(true);
+    try {
+      v.load();
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // -- Auto-hiding overlay chrome (edge nav + center play/skip) ------------
   useEffect(() => {
@@ -457,10 +515,23 @@ export default function VideoPlayer({
           controls
           controlsList="nodownload"
           disablePictureInPicture
-          preload="metadata"
+          preload="auto"
           playsInline
         />
-        {countdown === null ? centerControls : null}
+        {buffering && !loadError ? (
+          <div className="sx-player-loading" aria-hidden="true">
+            <span className="sx-player-spinner" />
+          </div>
+        ) : null}
+        {loadError ? (
+          <div className="sx-player-error" role="alert">
+            <p>This lesson didn&apos;t load.</p>
+            <button type="button" className="sx-btn sx-btn--paper" onClick={retry}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {countdown === null && !buffering && !loadError ? centerControls : null}
         {overlayNav}
         {nextOverlay}
       </div>

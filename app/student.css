@@ -1511,6 +1511,54 @@ a.sx-resume:hover .sx-resume-play {
   background: #0c0b09;
 }
 
+/* Buffering + error overlays. A bare <video> is just a black box while the
+   proxy connects to Drive, so a lesson swap reads as a dead click. These give
+   honest "loading" / "it failed, retry" feedback over that gap. */
+.sx-player-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(120% 120% at 50% 50%, rgba(12, 11, 9, 0.18), rgba(12, 11, 9, 0.52));
+  pointer-events: none;
+}
+
+.sx-player-spinner {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 3px solid rgba(246, 244, 236, 0.24);
+  border-top-color: #f6f4ec;
+  animation: sx-spin 720ms linear infinite;
+}
+
+@keyframes sx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sx-player-error {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  color: #f6f4ec;
+  background: rgba(12, 11, 9, 0.84);
+}
+
+.sx-player-error p {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
 /* Edge prev/next — calm circular controls, auto-hidden by the player after
    a few seconds of playback.
 
@@ -2762,6 +2810,18 @@ a.sx-resume:hover .sx-resume-play {
   }
 }
 
+/* On phones the OS/browser back gesture already covers "go back," so the
+   in-page back button is redundant chrome — drop it and tighten the top of the
+   watch page so the player sits up under the header. */
+@media (max-width: 700px) {
+  .sx-back {
+    display: none;
+  }
+  .sx-watch {
+    padding-top: clamp(12px, 3.5vw, 18px);
+  }
+}
+
 /* ==========================================================================
    REDUCED MOTION
    ========================================================================== */
@@ -2781,5 +2841,10 @@ a.sx-resume:hover .sx-resume-play {
   .sx-rail-pulse {
     animation: none !important;
     box-shadow: 0 0 0 3px rgba(32, 101, 74, 0.2);
+  }
+  /* The buffering spinner is a functional status indicator, not decoration —
+     keep it turning (gently) so "loading" never looks frozen. */
+  .sx-player-spinner {
+    animation: sx-spin 1200ms linear infinite !important;
   }
 }
