@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { Home, LogOut } from "lucide-react";
 import { signOut } from "@/lib/auth";
 import { isGeminiConfigured } from "@/lib/gemini";
 import StudentChatWidget from "@/components/StudentChatWidget";
@@ -24,6 +24,10 @@ export default function StudentTopbar({ accessUntil }: Props) {
             </span>
           </Link>
           <div className="sx-topbar-right">
+            <Link href="/dashboard" className="sx-btn sx-btn--ghost sx-home">
+              <Home size={15} aria-hidden="true" />
+              Home
+            </Link>
             {accessUntil ? (
               <span className="sx-access-chip">Access until {accessUntil}</span>
             ) : null}

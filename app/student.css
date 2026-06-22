@@ -527,6 +527,20 @@
   font-size: 0.83rem;
 }
 
+/* Home shortcut, top-right. Mirrors the sign-out button's compact ghost style;
+   stays visible on mobile (where the in-page back button is hidden) as the way
+   back to the dashboard. */
+.sx-home {
+  min-height: 36px;
+  padding: 5px 14px;
+  font-size: 0.83rem;
+  text-decoration: none;
+}
+
+.sx-home:hover {
+  text-decoration: none;
+}
+
 /* ==========================================================================
    PAGE-LOAD REVEAL  (one orchestrated moment, then everything is still)
    ========================================================================== */
@@ -1511,34 +1525,8 @@ a.sx-resume:hover .sx-resume-play {
   background: #0c0b09;
 }
 
-/* Buffering + error overlays. A bare <video> is just a black box while the
-   proxy connects to Drive, so a lesson swap reads as a dead click. These give
-   honest "loading" / "it failed, retry" feedback over that gap. */
-.sx-player-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(120% 120% at 50% 50%, rgba(12, 11, 9, 0.18), rgba(12, 11, 9, 0.52));
-  pointer-events: none;
-}
-
-.sx-player-spinner {
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  border: 3px solid rgba(246, 244, 236, 0.24);
-  border-top-color: #f6f4ec;
-  animation: sx-spin 720ms linear infinite;
-}
-
-@keyframes sx-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
+/* Error overlay. The native <video> handles its own buffering indicator, so we
+   only surface a retry when a load genuinely fails. */
 .sx-player-error {
   position: absolute;
   inset: 0;
@@ -1709,13 +1697,6 @@ a.sx-resume:hover .sx-resume-play {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
-}
-
-/* Suppress the browser's own big center play overlay so it can't double up
-   with our custom play button. The bottom control bar stays (scrubber, volume,
-   fullscreen). */
-.sx-player video::-webkit-media-controls-overlay-play-button {
-  display: none;
 }
 
 /* Up-next countdown overlay */
@@ -2805,6 +2786,7 @@ a.sx-resume:hover .sx-resume-play {
   .sx-back,
   .sx-note-link,
   .sx-signout,
+  .sx-home,
   .sx-access-chip {
     min-height: 44px;
   }
@@ -2841,10 +2823,5 @@ a.sx-resume:hover .sx-resume-play {
   .sx-rail-pulse {
     animation: none !important;
     box-shadow: 0 0 0 3px rgba(32, 101, 74, 0.2);
-  }
-  /* The buffering spinner is a functional status indicator, not decoration —
-     keep it turning (gently) so "loading" never looks frozen. */
-  .sx-player-spinner {
-    animation: sx-spin 1200ms linear infinite !important;
   }
 }

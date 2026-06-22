@@ -1,15 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-} from "lucide-react";
-const SKIP_SECONDS = 10;
 
 /**
  * Persist progress via a route handler (NOT a Server Action). Server Actions
@@ -52,13 +43,13 @@ type Props = {
 
 /**
  * HTML5 video player when the provider supports resume (server-proxied Drive
- * stream). Real `currentTime` lets us seek to the saved position and capture
- * accurate progress. Falls back to a plain Drive iframe when streaming isn't
- * available — in that mode we cannot read currentTime, so we skip auto-progress.
+ * stream). We lean on the browser's NATIVE controls + native loading indicator
+ * — no custom play button or spinner overlay — and only add the behaviour the
+ * native element can't do on its own: resume-seek, progress capture, autoplay
+ * on lesson select, and an end-of-video "up next" auto-advance.
  *
- * Navigation is delegated to `onPrev`/`onNext` so the parent shell can swap the
- * lesson in place. The prev/next overlay arrows auto-hide ~3s after playback
- * starts and reappear on pause or pointer movement.
+ * Falls back to a plain Drive iframe when streaming isn't available (no
+ * programmatic currentTime, so progress/resume are skipped there).
  */
 const STORAGE_KEY = (videoId: string) => `lms:video-progress:${videoId}`;
 
@@ -98,58 +89,25 @@ function beacon(videoId: string, t: number) {
   }
 }
 
-const HIDE_AFTER_MS = 2000;
-
 export default function VideoPlayer({
   videoId,
   src,
   streaming,
   initialTimestamp,
-  hasPrev,
   hasNext,
-  prevTitle,
-  nextTitle,
-  onPrev,
   onNext,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const frameRef = useRef<HTMLDivElement | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  // Controls the visibility of all overlay chrome (edge nav + center cluster).
-  const [chromeVisible, setChromeVisible] = useState(true);
-  const [playing, setPlaying] = useState(false);
-  // Starts true so the spinner is on screen the instant the element mounts
-  // (i.e. the moment a lesson swap remounts the player), before any byte lands.
-  const [buffering, setBuffering] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const cancelRef = useRef(false);
-  // Debounces the spinner on mid-playback stalls so brief `waiting` blips don't
-  // flash a loader over a video that's actually playing.
-  const stallTimerRef = useRef<number | undefined>(undefined);
-
-  const togglePlay = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused || v.ended) {
-      void v.play().catch(() => {});
-    } else {
-      v.pause();
-    }
-  }, []);
-
-  const skip = useCallback((delta: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : Infinity;
-    v.currentTime = Math.max(0, Math.min(dur, v.currentTime + delta));
-  }, []);
 
   // Keep the latest onNext in a ref so the progress effect (which only runs on
   // videoId change) always calls the current callback on auto-advance.
   const onNextRef = useRef(onNext);
   onNextRef.current = onNext;
 
-  // -- Progress tracking (streaming only) ---------------------------------
+  // -- Progress tracking + auto-advance (streaming only) ------------------
   useEffect(() => {
     if (!streaming) return;
     const v = videoRef.current;
@@ -260,66 +218,30 @@ export default function VideoPlayer({
     };
   }, [videoId, streaming, initialTimestamp]);
 
-  // -- Buffering / error overlay (streaming only) --------------------------
-  // A bare <video> renders only a black rectangle while it connects to the
-  // proxy and buffers, so a lesson swap reads as a dead click. Drive a spinner
-  // off the element's readiness events. Two rules kill the "playing but still
-  // loading" glitch: (1) any real progress (`timeupdate`/`playing`/`canplay`)
-  // hides it instantly; (2) a stall only shows the spinner if it lasts ~350ms,
-  // so a momentary re-buffer that resolves on the next frame never flashes.
+  // -- Autoplay on select + hard-error surface (streaming only) -----------
+  // Selecting a lesson (rail tap / "play next") happens in-document, so the
+  // page holds sticky user activation and play() is allowed — both for the
+  // chosen video and for the auto-advanced next one. On a cold first load with
+  // no prior interaction the browser may block it; we swallow that and the
+  // native controls remain. A genuine media error shows a retry.
   useEffect(() => {
-    if (!streaming) {
-      setBuffering(false);
-      return;
-    }
+    if (!streaming) return;
     const v = videoRef.current;
     if (!v) return;
     setLoadError(false);
-
-    const clearStall = () => {
-      if (stallTimerRef.current) {
-        window.clearTimeout(stallTimerRef.current);
-        stallTimerRef.current = undefined;
-      }
+    let tried = false;
+    const tryPlay = () => {
+      if (tried) return;
+      tried = true;
+      void v.play().catch(() => {});
     };
-    const ready = () => {
-      clearStall();
-      setBuffering(false);
-    };
-    const stall = () => {
-      clearStall();
-      stallTimerRef.current = window.setTimeout(() => setBuffering(true), 350);
-    };
-    const fail = () => {
-      clearStall();
-      setLoadError(true);
-      setBuffering(false);
-    };
-
-    v.addEventListener("loadeddata", ready);
-    v.addEventListener("canplay", ready);
-    v.addEventListener("canplaythrough", ready);
-    v.addEventListener("playing", ready);
-    v.addEventListener("timeupdate", ready);
-    v.addEventListener("seeked", ready);
-    v.addEventListener("waiting", stall);
-    v.addEventListener("seeking", stall);
-    v.addEventListener("error", fail);
-    // On (re)mount show the spinner immediately only if not yet playable — the
-    // expected case on a fresh load. If it's already buffered, stay clean.
-    setBuffering(v.readyState < 3 /* HAVE_FUTURE_DATA */);
-
+    const onError = () => setLoadError(true);
+    v.addEventListener("canplay", tryPlay);
+    v.addEventListener("error", onError);
+    if (v.readyState >= 3 /* HAVE_FUTURE_DATA */) tryPlay();
     return () => {
-      clearStall();
-      v.removeEventListener("loadeddata", ready);
-      v.removeEventListener("canplay", ready);
-      v.removeEventListener("canplaythrough", ready);
-      v.removeEventListener("playing", ready);
-      v.removeEventListener("timeupdate", ready);
-      v.removeEventListener("seeked", ready);
-      v.removeEventListener("waiting", stall);
-      v.removeEventListener("seeking", stall);
-      v.removeEventListener("error", fail);
+      v.removeEventListener("canplay", tryPlay);
+      v.removeEventListener("error", onError);
     };
   }, [videoId, streaming]);
 
@@ -327,178 +249,13 @@ export default function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     setLoadError(false);
-    setBuffering(true);
     try {
       v.load();
+      void v.play().catch(() => {});
     } catch {
       /* ignore */
     }
   }, []);
-
-  // -- Auto-hiding overlay chrome (edge nav + center play/skip) ------------
-  useEffect(() => {
-    if (!streaming && !hasPrev && !hasNext) return;
-    const frame = frameRef.current;
-    if (!frame) return;
-
-    let hideTimer: number | undefined;
-    let isPlaying = false;
-    const clearTimer = () => {
-      if (hideTimer) {
-        window.clearTimeout(hideTimer);
-        hideTimer = undefined;
-      }
-    };
-    // Streaming: only auto-hide while actually playing (so a paused player keeps
-    // the big play button on screen). Iframe: we can't read playback state, so
-    // auto-hide on pointer inactivity.
-    const shouldAutoHide = () => (streaming ? isPlaying : true);
-    // Never fade chrome out from under a cursor that's parked on a control.
-    const chromeHovered = () =>
-      !!frame.querySelector(".sx-player-edge:hover, .sx-ctl:hover");
-    const scheduleHide = () => {
-      clearTimer();
-      if (shouldAutoHide()) {
-        hideTimer = window.setTimeout(() => {
-          if (chromeHovered()) {
-            scheduleHide();
-            return;
-          }
-          setChromeVisible(false);
-        }, HIDE_AFTER_MS);
-      }
-    };
-    const reveal = () => {
-      setChromeVisible(true);
-      scheduleHide();
-    };
-
-    const onMove = () => reveal();
-    const onLeave = () => {
-      if (shouldAutoHide() && !chromeHovered()) setChromeVisible(false);
-    };
-    frame.addEventListener("mousemove", onMove);
-    frame.addEventListener("touchstart", onMove, { passive: true });
-    frame.addEventListener("mouseleave", onLeave);
-
-    const v = videoRef.current;
-    let onPlay: (() => void) | undefined;
-    let onPause: (() => void) | undefined;
-    if (streaming && v) {
-      onPlay = () => {
-        isPlaying = true;
-        setPlaying(true);
-        reveal(); // show, then fade after HIDE_AFTER_MS
-      };
-      onPause = () => {
-        isPlaying = false;
-        setPlaying(false);
-        clearTimer();
-        setChromeVisible(true);
-      };
-      v.addEventListener("play", onPlay);
-      v.addEventListener("playing", onPlay);
-      v.addEventListener("pause", onPause);
-      v.addEventListener("ended", onPause);
-      setPlaying(!v.paused && !v.ended);
-    }
-
-    // Start visible; if iframe, fade after the initial window.
-    reveal();
-
-    return () => {
-      clearTimer();
-      frame.removeEventListener("mousemove", onMove);
-      frame.removeEventListener("touchstart", onMove);
-      frame.removeEventListener("mouseleave", onLeave);
-      if (streaming && v) {
-        if (onPlay) {
-          v.removeEventListener("play", onPlay);
-          v.removeEventListener("playing", onPlay);
-        }
-        if (onPause) {
-          v.removeEventListener("pause", onPause);
-          v.removeEventListener("ended", onPause);
-        }
-      }
-    };
-  }, [videoId, streaming, hasPrev, hasNext]);
-
-  // Effective chrome visibility. Folding `buffering`/`loadError` in here (rather
-  // than mounting/unmounting the controls) means the edge + center clusters fade
-  // via CSS instead of popping in and out — no glitchy flicker on load, and the
-  // controls never overlap the spinner.
-  const chromeShown = chromeVisible && !buffering && !loadError;
-
-  const overlayNav = (
-    <>
-      {hasPrev ? (
-        <button
-          type="button"
-          onClick={() => onPrev?.()}
-          className="sx-player-edge sx-player-edge--prev"
-          title={prevTitle ? `Previous: ${prevTitle}` : "Previous lesson"}
-          aria-label={prevTitle ? `Previous lesson: ${prevTitle}` : "Previous lesson"}
-        >
-          <ChevronLeft size={24} strokeWidth={2.4} aria-hidden="true" />
-        </button>
-      ) : null}
-      {hasNext ? (
-        <button
-          type="button"
-          onClick={() => onNext?.()}
-          className="sx-player-edge sx-player-edge--next"
-          title={nextTitle ? `Up next: ${nextTitle}` : "Next lesson"}
-          aria-label={nextTitle ? `Next lesson: ${nextTitle}` : "Next lesson"}
-        >
-          <ChevronRight size={24} strokeWidth={2.4} aria-hidden="true" />
-        </button>
-      ) : null}
-    </>
-  );
-
-  // Netflix-style center cluster: 10s rewind, big play/pause, 10s forward.
-  // Streaming only — the Drive iframe has its own controls we can't drive.
-  const centerControls = (
-    <div className="sx-ctls" aria-hidden={!chromeShown}>
-      <button
-        type="button"
-        className="sx-ctl sx-ctl--skip"
-        onClick={() => skip(-SKIP_SECONDS)}
-        aria-label={`Rewind ${SKIP_SECONDS} seconds`}
-        title={`Rewind ${SKIP_SECONDS}s`}
-        tabIndex={chromeShown ? 0 : -1}
-      >
-        <RotateCcw size={26} strokeWidth={2.2} aria-hidden="true" />
-        <span className="sx-ctl-sec">{SKIP_SECONDS}</span>
-      </button>
-      <button
-        type="button"
-        className="sx-ctl sx-ctl--play"
-        onClick={togglePlay}
-        aria-label={playing ? "Pause" : "Play"}
-        title={playing ? "Pause" : "Play"}
-        tabIndex={chromeShown ? 0 : -1}
-      >
-        {playing ? (
-          <Pause size={30} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
-        ) : (
-          <Play size={30} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
-        )}
-      </button>
-      <button
-        type="button"
-        className="sx-ctl sx-ctl--skip"
-        onClick={() => skip(SKIP_SECONDS)}
-        aria-label={`Forward ${SKIP_SECONDS} seconds`}
-        title={`Forward ${SKIP_SECONDS}s`}
-        tabIndex={chromeShown ? 0 : -1}
-      >
-        <RotateCw size={26} strokeWidth={2.2} aria-hidden="true" />
-        <span className="sx-ctl-sec">{SKIP_SECONDS}</span>
-      </button>
-    </div>
-  );
 
   const nextOverlay =
     countdown !== null && hasNext ? (
@@ -533,12 +290,7 @@ export default function VideoPlayer({
 
   if (streaming) {
     return (
-      <div
-        ref={frameRef}
-        className="sx-player"
-        data-has-edges={hasPrev || hasNext ? "true" : undefined}
-        data-chrome-visible={chromeShown ? "true" : "false"}
-      >
+      <div className="sx-player">
         <video
           ref={videoRef}
           src={src}
@@ -548,11 +300,6 @@ export default function VideoPlayer({
           preload="auto"
           playsInline
         />
-        {buffering && !loadError ? (
-          <div className="sx-player-loading" aria-hidden="true">
-            <span className="sx-player-spinner" />
-          </div>
-        ) : null}
         {loadError ? (
           <div className="sx-player-error" role="alert">
             <p>This lesson didn&apos;t load.</p>
@@ -561,29 +308,19 @@ export default function VideoPlayer({
             </button>
           </div>
         ) : null}
-        {/* Mounted whenever there's no error/up-next overlay; CSS fades it via
-            data-chrome-visible so it never pops in/out or overlaps the spinner. */}
-        {countdown === null && !loadError ? centerControls : null}
-        {overlayNav}
         {nextOverlay}
       </div>
     );
   }
-  // Fallback: Drive iframe, no progress tracking.
+  // Fallback: Drive iframe with its own controls, no progress tracking.
   return (
-    <div
-      ref={frameRef}
-      className="sx-player"
-      data-has-edges={hasPrev || hasNext ? "true" : undefined}
-      data-chrome-visible={chromeShown ? "true" : "false"}
-    >
+    <div className="sx-player">
       <iframe
         src={src}
         allow="autoplay"
         allowFullScreen
         referrerPolicy="no-referrer"
       />
-      {overlayNav}
     </div>
   );
 }
