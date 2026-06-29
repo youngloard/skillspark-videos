@@ -217,64 +217,56 @@ export default async function StudentsPage({
     activeChips.push({ key: "courseId", label: `Course: ${courseLabel(sp.courseId)}` });
 
   return (
-    <div className="wide-canvas students-page">
-      <header className="students-hero">
-        <div className="students-hero-text">
-          <span className="eyebrow">
-            <Users size={14} aria-hidden="true" />
-            Roster
-          </span>
-          <h1>Students</h1>
-          <p>
-            Manage learner access through batches. Apply filters below to narrow the roster.
-          </p>
+    <div className="adm wide-canvas students-page">
+      <header className="adm-head">
+        <div className="adm-head-row">
+          <div>
+            <span className="adm-eyebrow">
+              <Users size={13} aria-hidden="true" />
+              Roster
+            </span>
+            <h1>Students</h1>
+          </div>
+          <nav className="adm-links" aria-label="Shortcuts">
+            <Link href="#add-student" className="adm-link">
+              <UserPlus size={15} aria-hidden="true" />
+              Add a student
+            </Link>
+            <Link href="/admin/bulk" className="adm-link">
+              <Upload size={15} aria-hidden="true" />
+              Bulk import
+            </Link>
+            <Link href="/admin/batches" className="adm-link">
+              <Layers3 size={15} aria-hidden="true" />
+              Manage batches <small>({batches.length})</small>
+            </Link>
+          </nav>
         </div>
-        <div className="students-hero-stats" role="list" aria-label="Roster segments — click to filter">
+        <p className="adm-sub">
+          Manage learner access through batches. The counts below double as one-click filters.
+        </p>
+        <div className="adm-stats" role="list" aria-label="Roster segments — click to filter">
           {kpiTiles.map((tile) => (
             <Link
               key={tile.label}
               href={tile.href}
-              className="kpi kpi--link"
+              className="adm-stat"
               data-tone={tile.tone}
               data-active={tile.active ? "true" : undefined}
               role="listitem"
               title={tile.title}
             >
-              <span className="kpi-label">{tile.label}</span>
-              <span className="kpi-value">{tile.value}</span>
-              <span className="kpi-filter-hint" aria-hidden="true">
-                {tile.active ? "Filtering · click to clear" : "Click to filter"}
+              <span className="adm-stat-label">{tile.label}</span>
+              <span className="adm-stat-value">{tile.value}</span>
+              <span className="adm-stat-hint" aria-hidden="true">
+                {tile.active ? "filtering · clear" : "filter"}
               </span>
             </Link>
           ))}
         </div>
       </header>
 
-      <div className="quick-actions" aria-label="Shortcuts">
-        <Link href="#add-student" className="quick-action" data-tone="violet">
-          <UserPlus size={16} aria-hidden="true" />
-          <span>
-            <strong>Add a student</strong>
-            <small>Single enrollment</small>
-          </span>
-        </Link>
-        <Link href="/admin/bulk" className="quick-action" data-tone="cyan">
-          <Upload size={16} aria-hidden="true" />
-          <span>
-            <strong>Bulk import</strong>
-            <small>CSV upload</small>
-          </span>
-        </Link>
-        <Link href="/admin/batches" className="quick-action" data-tone="rose">
-          <Layers3 size={16} aria-hidden="true" />
-          <span>
-            <strong>Manage batches</strong>
-            <small>{batches.length} configured</small>
-          </span>
-        </Link>
-      </div>
-
-      <form className="filter-bar" method="get" aria-label="Filter students">
+      <form className="adm-toolbar" method="get" aria-label="Filter students">
         <div className="search-input">
           <Search size={16} aria-hidden="true" />
           <input

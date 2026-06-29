@@ -1,3 +1,4 @@
+import { BookOpen } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/authorization";
 import { createCourse } from "@/actions/courses";
@@ -11,14 +12,30 @@ export default async function CoursesPage() {
     include: { _count: { select: { modules: true, videos: true } } },
   });
   return (
-    <div className="wide-canvas">
-      <h1>Courses</h1>
-      <div className="add-student-panel" style={{ marginBottom: "32px" }}>
-        <div className="form-card-header">
-          <span>Add a New Course</span>
+    <div className="adm wide-canvas">
+      <header className="adm-head">
+        <div className="adm-head-row">
+          <div>
+            <span className="adm-eyebrow">
+              <BookOpen size={13} aria-hidden="true" />
+              Catalog
+            </span>
+            <h1>Courses</h1>
+          </div>
+          <span className="adm-count">{courses.length} total</span>
+        </div>
+        <p className="adm-sub">
+          Each real course is one row here. Access is granted by assigning the course to a batch —
+          never to a student directly.
+        </p>
+      </header>
+
+      <section className="adm-section">
+        <div className="adm-section-head">
+          <h2>Add a new course</h2>
         </div>
         <ActionForm
-          className="form-card-body form-vertical"
+          className="adm-form"
           successMessage="Course created."
           resetOnSuccess
           action={async (fd: FormData) => {
@@ -32,37 +49,34 @@ export default async function CoursesPage() {
             });
           }}
         >
-          <p style={{ color: "var(--muted)", fontWeight: "500", marginBottom: "16px" }}>
-            <strong>Navigation Layout:</strong> "module" splits the course into modules and chapters. "flat" puts lessons/videos directly under the course header.
+          <p className="adm-note">
+            <strong>Navigation layout:</strong> “module” splits the course into modules and chapters.
+            “flat” puts lessons/videos directly under the course header.
           </p>
           <div className="form-grid">
             <div className="form-field-group">
               <label>
-                Course Name
+                Course name
                 <input name="name" placeholder="e.g. Advanced JavaScript" required />
               </label>
             </div>
             <div className="form-field-group">
               <label>
-                Short Description
-                <input name="description" placeholder="Optional brief outline..." />
+                Short description
+                <input name="description" placeholder="Optional brief outline…" />
               </label>
             </div>
           </div>
           <div className="form-grid">
             <div className="form-field-group">
               <label>
-                Cover Image URL
-                <input
-                  name="imageUrl"
-                  placeholder="e.g. https://images.com/cover.png"
-                  type="url"
-                />
+                Cover image URL
+                <input name="imageUrl" placeholder="e.g. https://images.com/cover.png" type="url" />
               </label>
             </div>
             <div className="form-field-group">
               <label>
-                Course Status
+                Course status
                 <select name="status">
                   <option value="active">active</option>
                   <option value="inactive">inactive</option>
@@ -71,7 +85,7 @@ export default async function CoursesPage() {
             </div>
             <div className="form-field-group">
               <label>
-                Navigation Layout
+                Navigation layout
                 <select name="layout" defaultValue="module">
                   <option value="module">module-based</option>
                   <option value="flat">flat (no modules)</option>
@@ -83,18 +97,20 @@ export default async function CoursesPage() {
             <button type="submit">Create course</button>
           </div>
         </ActionForm>
-      </div>
+      </section>
 
-      <CoursesBrowser
-        courses={courses.map((c) => ({
-          id: c.id,
-          name: c.name,
-          layout: c.layout,
-          status: c.status,
-          moduleCount: c._count.modules,
-          videoCount: c._count.videos,
-        }))}
-      />
+      <section className="adm-section">
+        <CoursesBrowser
+          courses={courses.map((c) => ({
+            id: c.id,
+            name: c.name,
+            layout: c.layout,
+            status: c.status,
+            moduleCount: c._count.modules,
+            videoCount: c._count.videos,
+          }))}
+        />
+      </section>
     </div>
   );
 }

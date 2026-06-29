@@ -10040,3 +10040,419 @@ textarea {
     opacity: 0.5;
   }
 }
+
+/* ==========================================================================
+   EDITORIAL / FLAT ADMIN LAYER  (.adm)
+   --------------------------------------------------------------------------
+   Search, Students, Bulk and Courses opt into this by wrapping their root in
+   `.adm`. The goal: hairline rules + whitespace instead of a bordered card
+   around every block. This layer is intentionally LAST in the file and uses
+   `!important` only where it must beat the neobrutalist override layer above
+   (2px black borders / hard offset shadows). New class names (adm-*) do not
+   collide with that layer, so most of this is plain low-specificity CSS.
+   ========================================================================== */
+
+.adm {
+  display: grid !important;
+  gap: 48px !important;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---- page header -------------------------------------------------------- */
+.adm-head {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.adm-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.adm-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.adm-eyebrow svg { color: var(--muted); }
+.adm-head h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+  max-width: none !important;
+  font-size: clamp(1.7rem, 3vw, 2.5rem) !important;
+  font-weight: 760 !important;
+  letter-spacing: -0.03em !important;
+}
+.adm-head h1::after { content: none !important; }   /* kill inherited underline */
+.adm-sub {
+  margin: 0 !important;
+  max-width: 72ch;
+  color: var(--muted) !important;
+  font-size: 0.96rem;
+  font-weight: 500;
+}
+.adm-count {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- inline stat strip (no boxes, divided by hairlines) ---------------- */
+.adm-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+}
+.adm-stat {
+  display: grid;
+  gap: 6px;
+  padding: 4px 26px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--ink) !important;
+  text-decoration: none !important;
+  transition: opacity 160ms ease;
+}
+.adm-stat:first-child { padding-left: 0; border-left: 0; }
+.adm-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.adm-stat-value {
+  color: var(--ink);
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.adm-stat[data-tone="active"] .adm-stat-value { color: var(--green); }
+.adm-stat[data-tone="blocked"] .adm-stat-value { color: var(--red); }
+.adm-stat[data-tone="expired"] .adm-stat-value { color: var(--cyan); }
+.adm-stat-hint {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+a.adm-stat:hover { opacity: 1; }
+a.adm-stat:hover .adm-stat-hint { opacity: 1; color: var(--blue); }
+a.adm-stat:hover .adm-stat-label { color: var(--ink); }
+.adm-stat[data-active="true"] .adm-stat-label { color: var(--ink); }
+.adm-stat[data-active="true"] .adm-stat-value {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+.adm-stat[data-active="true"] .adm-stat-hint { opacity: 1; color: var(--ink-soft); }
+
+/* ---- quick links (text, not cards) ------------------------------------- */
+.adm-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+}
+.adm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft) !important;
+  font-weight: 650;
+  font-size: 0.92rem;
+  text-decoration: none !important;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+.adm-link svg { color: var(--muted); transition: color 150ms ease; }
+.adm-link small { color: var(--muted); font-weight: 600; }
+.adm-link:hover { color: var(--ink) !important; border-bottom-color: var(--ink); }
+.adm-link:hover svg { color: var(--ink); }
+
+/* ---- filter toolbar (flat, no surrounding box) ------------------------- */
+.adm form.adm-toolbar,
+.adm .adm-toolbar {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px !important;
+  grid-template-columns: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.adm-toolbar .search-input {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+.adm-toolbar .search-input > svg {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.adm-toolbar .search-input input { width: 100%; padding-left: 40px; }
+.adm-toolbar .filter-submit { margin-left: auto; }
+
+/* ---- section: heading with a rule, content below (no card) ------------- */
+.adm-section { display: grid; gap: 20px; }
+.adm-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.adm-section-head h2,
+h2.adm-section-title {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  font-size: 1.1rem !important;
+  font-weight: 720 !important;
+  letter-spacing: -0.012em !important;
+}
+.adm-section-head h2::before { content: none !important; }
+.adm-meta { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+
+/* ---- flat forms --------------------------------------------------------- */
+.adm .adm-form {
+  display: grid !important;
+  grid-template-columns: none !important;
+  gap: 22px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.adm .adm-form > p:first-child { margin: 0 !important; }
+.adm-note {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.adm-note strong { color: var(--ink-soft); }
+.adm .form-actions {
+  margin: 0 !important;
+  padding-top: 20px !important;
+  border-top: 1px solid var(--line);
+}
+
+/* primary submit buttons - solid ink, flat (kills the purple glow + lift) */
+.adm .form-actions > button,
+.adm .adm-actions > button {
+  min-width: 200px;
+  background: var(--ink) !important;
+  color: #fff !important;
+  border: 1px solid var(--ink) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  font-weight: 680 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.adm .form-actions > button:hover,
+.adm .adm-actions > button:hover {
+  background: #232323 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.adm .form-actions > button:disabled { opacity: 0.5 !important; }
+
+/* ---- stacked field + THE dropdown "stripping" fix ---------------------- */
+/* A labelled <Dropdown> renders its label inline to the LEFT of the trigger.
+   In a narrow form-grid column that crowds the 240px trigger out of the
+   column and clips it. Inside a field we stack the label on top instead, so
+   the trigger gets the full column width. */
+.adm .form-field-group .dropdown,
+.adm .adm-field .dropdown {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+.adm .form-field-group .dropdown .dropdown-label,
+.adm .adm-field .dropdown .dropdown-label {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.adm .form-field-group .dropdown .dropdown-trigger,
+.adm .adm-field .dropdown .dropdown-trigger {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 46px;
+}
+
+/* ---- flatten the inherited neobrutalist boxes on these pages ----------- */
+.adm textarea {
+  border: 1px solid var(--line-strong) !important;
+  border-radius: 10px !important;
+  background: var(--surface) !important;
+  box-shadow: none !important;
+}
+.adm textarea:focus {
+  border-color: var(--ink) !important;
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.08) !important;
+}
+
+.adm .add-student-panel {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+.adm .add-student-panel > summary,
+.adm .add-student-panel summary.form-card-header,
+.adm .add-student-panel .form-card-header {
+  padding: 14px 0 !important;
+  font-family: inherit !important;
+  font-size: 1.1rem !important;
+  font-weight: 720 !important;
+  letter-spacing: -0.012em !important;
+  text-transform: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+}
+.adm .add-student-panel[open] > summary { background: transparent !important; }
+.adm .add-student-panel > summary svg { color: var(--ink-soft); }
+.adm .add-student-panel > p { padding: 14px 0 0 !important; }
+.adm .add-student-panel > form { padding: 22px 0 0 !important; }
+
+/* file-format spec: a left accent rule instead of a boxed card */
+.adm .column-spec {
+  gap: 14px;
+  margin: 0 !important;
+  padding: 2px 0 2px 18px !important;
+  border: 0 !important;
+  border-left: 2px solid var(--line-strong) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+.adm .column-spec-example pre {
+  background: var(--surface-2) !important;
+  border-color: var(--line) !important;
+}
+
+/* tables: keep the hairline frame, drop the hard shadow */
+.adm .table-wrap {
+  border: 1px solid var(--line) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+.adm table { border: 0 !important; box-shadow: none !important; background: transparent !important; }
+.adm thead { background: var(--surface-2) !important; }
+
+/* count badge - plain muted number, not a pill */
+.adm .count-badge {
+  border: 0;
+  padding: 0;
+  margin-left: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* active-filter chips: inline, no dashed box */
+.adm .filter-chips {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* results header row */
+.adm .results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.adm .results-head h2 {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  font-size: 1.1rem !important;
+  font-weight: 720 !important;
+}
+.adm .results-head h2::before { content: none !important; }
+
+/* CoursesBrowser toolbar sits flat inside its section */
+.adm .browser { display: grid; gap: 18px; }
+.adm .browser-toolbar { margin: 0; }
+.adm .browser-toolbar h2 {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.adm .browser-toolbar h2::before { content: none !important; }
+
+@media (max-width: 720px) {
+  .adm-stat { padding: 4px 16px; }
+}
+
+/* multi-check picker: flatten inside the editorial layer */
+.adm .picker-fieldset {
+  border: 1px solid var(--line-strong) !important;
+  border-radius: 12px !important;
+  background: var(--surface-2) !important;
+  box-shadow: none !important;
+  padding: 16px !important;
+}
+.adm .picker-fieldset legend {
+  font-family: inherit !important;
+  text-transform: uppercase !important;
+  background: transparent !important;
+  color: var(--ink-soft) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 6px !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  box-shadow: none !important;
+}
