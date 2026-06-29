@@ -30,6 +30,16 @@ type Props = {
   minWidth?: number;
   /** ARIA label if no visual label is provided. */
   ariaLabel?: string;
+  /**
+   * Makes the dropdown "creatable": when the search has no exact match, a
+   * "+ Add '<typed>'" row appears. The callback creates the record and returns
+   * the new option (the project's `R` shape); it's appended and auto-selected.
+   */
+  onCreate?: (
+    label: string,
+  ) => Promise<{ ok: true; data: DropdownOption } | { ok: false; error: string }>;
+  /** Verb shown in the create row, e.g. "Add" → `Add "Excel"`. */
+  createLabel?: string;
 };
 
 type Pos = {
@@ -51,11 +61,16 @@ export default function Dropdown({
   searchable,
   minWidth = 180,
   ariaLabel,
+  onCreate,
+  createLabel = "Add",
 }: Props) {
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [extraOptions, setExtraOptions] = useState<DropdownOption[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [pos, setPos] = useState<Pos>({
     top: 0,
     left: 0,
@@ -72,18 +87,51 @@ export default function Dropdown({
 
   useEffect(() => setMounted(true), []);
 
-  const showSearch = searchable ?? options.length > 8;
-  const selected = options.find((o) => o.value === value);
+  // Options the server provided plus any created on the fly via `onCreate`.
+  const allOptions = useMemo(() => [...options, ...extraOptions], [options, extraOptions]);
+
+  const showSearch = searchable ?? (allOptions.length > 8 || !!onCreate);
+  const selected = allOptions.find((o) => o.value === value);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return options;
+    if (!q.trim()) return allOptions;
     const term = q.trim().toLowerCase();
-    return options.filter(
+    return allOptions.filter(
       (o) =>
         o.label.toLowerCase().includes(term) ||
         (o.hint?.toLowerCase().includes(term) ?? false),
     );
-  }, [q, options]);
+  }, [q, allOptions]);
+
+  // Offer "+ Add '<typed>'" when the search has a value with no exact label match.
+  const trimmedQ = q.trim();
+  const canCreate =
+    !!onCreate &&
+    trimmedQ.length > 0 &&
+    !allOptions.some((o) => o.label.toLowerCase() === trimmedQ.toLowerCase());
+
+  const create = async () => {
+    if (!onCreate || creating || !trimmedQ) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await onCreate(trimmedQ);
+      if (res.ok) {
+        setExtraOptions((prev) =>
+          prev.some((o) => o.value === res.data.value) ? prev : [...prev, res.data],
+        );
+        setValue(res.data.value);
+        setOpen(false);
+        triggerRef.current?.focus();
+      } else {
+        setCreateError(res.error || "Couldn't add that.");
+      }
+    } catch {
+      setCreateError("Couldn't add that.");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const recompute = () => {
     if (!triggerRef.current) return;
@@ -159,6 +207,7 @@ export default function Dropdown({
     if (!open) {
       setQ("");
       setActiveIdx(-1);
+      setCreateError(null);
     }
   }, [open, showSearch]);
 
@@ -179,6 +228,7 @@ export default function Dropdown({
       e.preventDefault();
       const target = filtered[activeIdx] ?? filtered[0];
       if (target) choose(target.value);
+      else if (canCreate) void create();
     }
   };
 
@@ -224,7 +274,7 @@ export default function Dropdown({
         </div>
       )}
       <ul className="dropdown-list" role="listbox" id={listId} tabIndex={-1}>
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !canCreate && (
           <li className="dropdown-empty" aria-disabled="true">
             No matches
           </li>
@@ -255,6 +305,17 @@ export default function Dropdown({
           );
         })}
       </ul>
+      {canCreate && (
+        <button
+          type="button"
+          className="dropdown-create"
+          onClick={() => void create()}
+          disabled={creating}
+        >
+          {creating ? "Adding…" : `${createLabel} “${trimmedQ}”`}
+        </button>
+      )}
+      {createError && <p className="dropdown-create-error">{createError}</p>}
     </div>
   ) : null;
 

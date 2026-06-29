@@ -68,11 +68,15 @@ const batchStudentsArgs = z.object({
 
 export async function bulkAddStudentsToBatch(
   formData: FormData,
-): Promise<R<{ created: number; addedExisting: number; skipped: number; failed: { line: number; reason: string }[] }>> {
+): Promise<R<{ created: number; addedExisting: number; skipped: number; coursesAssigned: number; failed: { line: number; reason: string }[] }>> {
   return withAdminD(async (admin) => {
     const text = await readFormText(formData);
     if (typeof text !== "string") return bad(text.error);
     if (!text.trim()) return bad("no input provided");
+
+    // batchId comes from a dropdown that defaults to "" — give a clear message
+    // rather than Zod's generic "String must contain at least 1 character(s)".
+    if (!String(formData.get("batchId") ?? "").trim()) return bad("pick a batch first");
 
     const parsed = batchStudentsArgs.safeParse({
       batchId: formData.get("batchId"),
@@ -86,6 +90,39 @@ export async function bulkAddStudentsToBatch(
 
     const batch = await prisma.batch.findUnique({ where: { id: parsed.data.batchId }, select: { id: true } });
     if (!batch) return bad("batch not found");
+
+    // Optionally assign the picked courses to this batch (students inherit them).
+    // Only genuinely-new assignments are inserted and audited; already-assigned
+    // courses are left untouched so re-running the form is a no-op for them.
+    const applyCourseIds = formData.getAll("applyCourseIds").map(String).filter(Boolean);
+    let coursesAssigned = 0;
+    if (applyCourseIds.length) {
+      const [validCourses, already] = await Promise.all([
+        prisma.course.findMany({ where: { id: { in: applyCourseIds } }, select: { id: true } }),
+        prisma.batchCourse.findMany({
+          where: { batchId: batch.id, courseId: { in: applyCourseIds } },
+          select: { courseId: true },
+        }),
+      ]);
+      const validIds = new Set(validCourses.map((c) => c.id));
+      const alreadySet = new Set(already.map((b) => b.courseId));
+      const toAdd = applyCourseIds.filter((c) => validIds.has(c) && !alreadySet.has(c));
+      if (toAdd.length) {
+        await prisma.batchCourse.createMany({
+          data: toAdd.map((courseId) => ({ batchId: batch.id, courseId })),
+          skipDuplicates: true,
+        });
+        for (const courseId of toAdd) {
+          await createAuditLog({
+            actorId: admin.id, actorEmail: admin.email, actorType: "admin",
+            action: "BATCH_COURSE_ASSIGNED", entityType: "Batch", entityId: batch.id,
+            newValue: { courseId, source: "bulk-add-students" },
+          });
+        }
+        coursesAssigned = toAdd.length;
+        revalidateTag(CATALOG_TAGS.batches);
+      }
+    }
 
     const { rows: rawRows, errors } = parseBatchStudents(parsed.data.text);
     const failed = errors.map((e) => ({ line: e.line, reason: e.reason }));
@@ -170,11 +207,11 @@ export async function bulkAddStudentsToBatch(
     await createAuditLog({
       actorId: admin.id, actorEmail: admin.email, actorType: "admin",
       action: "BULK_STUDENTS_ADDED_TO_BATCH", entityType: "Batch", entityId: batch.id,
-      newValue: { created, addedExisting, skipped, failedCount: failed.length },
+      newValue: { created, addedExisting, skipped, coursesAssigned, failedCount: failed.length },
     });
     revalidatePath("/admin/students");
     revalidatePath(`/admin/batches/${batch.id}`);
-    return { ok: true, data: { created, addedExisting, skipped, failed } };
+    return { ok: true, data: { created, addedExisting, skipped, coursesAssigned, failed } };
   });
 }
 

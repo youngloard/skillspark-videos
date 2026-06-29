@@ -8,7 +8,7 @@ import {
   batchSchema,
   idSchema,
 } from "@/lib/validations";
-import { bad, withAdmin, type R } from "./_shared";
+import { bad, withAdmin, withAdminD, type R, type RD } from "./_shared";
 
 const invalidateBatchCatalog = () => revalidateTag(CATALOG_TAGS.batches);
 
@@ -52,6 +52,56 @@ export async function createBatch(input: unknown): Promise<R<{ id: string }>> {
       if (e?.code === "P2002") return bad("duplicate batchCode");
       if (e?.code === "P2003") return bad("invalid course reference");
       return bad("create failed");
+    }
+  });
+}
+
+/**
+ * Creatable-dropdown helper: turn whatever the admin typed in the batch search
+ * into a real batch on the spot (batchCode = batchName = the typed text). Used
+ * by the bulk "add students to a batch" flow so a missing batch can be added
+ * without leaving the page. Returns a ready-to-select dropdown option. If a
+ * batch with that code already exists it's reused (never duplicated).
+ */
+export async function quickCreateBatch(
+  label: string,
+): Promise<RD<{ value: string; label: string; hint?: string }>> {
+  return withAdminD(async (admin) => {
+    const name = String(label ?? "").trim();
+    const parsed = batchSchema
+      .pick({ batchCode: true, batchName: true })
+      .safeParse({ batchCode: name, batchName: name });
+    if (!parsed.success)
+      return bad("batch name can only use letters, numbers, spaces, _ or -");
+
+    const existing = await prisma.batch.findUnique({
+      where: { batchCode: name },
+      select: { id: true, batchCode: true, batchName: true },
+    });
+    if (existing)
+      return { ok: true, data: { value: existing.id, label: existing.batchCode, hint: existing.batchName } };
+
+    try {
+      const b = await prisma.batch.create({
+        data: { batchCode: name, batchName: name, description: "Quick-added from bulk upload" },
+      });
+      await createAuditLog({
+        actorId: admin.id, actorEmail: admin.email, actorType: "admin",
+        action: "BATCH_CREATED", entityType: "Batch", entityId: b.id,
+        newValue: { batchCode: name, source: "bulk-quick-add" },
+      });
+      invalidateBatchCatalog();
+      revalidatePath("/admin/batches");
+      return { ok: true, data: { value: b.id, label: b.batchCode, hint: b.batchName } };
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        const again = await prisma.batch.findUnique({
+          where: { batchCode: name },
+          select: { id: true, batchCode: true, batchName: true },
+        });
+        if (again) return { ok: true, data: { value: again.id, label: again.batchCode, hint: again.batchName } };
+      }
+      return bad("couldn't add that batch");
     }
   });
 }

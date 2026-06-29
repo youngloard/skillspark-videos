@@ -6,6 +6,7 @@ import {
   bulkAddBatchesFromForm,
   bulkAddCoursesFromForm,
 } from "@/actions/bulk";
+import { quickCreateBatch } from "@/actions/batches";
 import MultiCheckPicker from "@/components/MultiCheckPicker";
 import Dropdown from "@/components/Dropdown";
 import ActionForm from "@/components/ActionForm";
@@ -63,7 +64,8 @@ export default async function BulkPage() {
             "Paste/upload the shared roster: column 1 = email, column 2 = the student id followed by the name (e.g. KLM 2606 1282 Seethal U → id \"KLM 2606 1282\", name \"Seethal U\").",
             "The student id is admin-given (taken from the file), never auto-generated.",
             "The sheet's title/header rows are ignored automatically.",
-            "Pick the batch first — it already has its courses; students inherit them.",
+            "Pick the batch first — students inherit its courses. No matching batch? Type a name in the batch box and choose “Add batch” to create it on the spot.",
+            "Optionally tick courses below to assign them to the batch in the same step (handy for a brand-new batch).",
             "Already-added students (matched by email or id) are skipped, so re-uploading the same file with new rows only adds the new ones.",
           ]}
           example="seethaludayan4@gmail.com, KLM 2606 1282 Seethal U"
@@ -79,7 +81,18 @@ export default async function BulkPage() {
         >
           <div className="form-grid">
             <div className="form-field-group">
-              <Dropdown name="batchId" label="Batch" options={batchOptions} placeholder="— pick a batch —" minWidth={240} />
+              <Dropdown
+                name="batchId"
+                label="Batch"
+                options={batchOptions}
+                placeholder="— pick a batch —"
+                minWidth={240}
+                createLabel="Add batch"
+                onCreate={async (label: string) => {
+                  "use server";
+                  return quickCreateBatch(label);
+                }}
+              />
             </div>
             <div className="form-field-group">
               <label>
@@ -109,6 +122,14 @@ export default async function BulkPage() {
               Or upload Excel / CSV / TXT
               <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt" />
             </label>
+          </div>
+          <div className="form-field-group">
+            <MultiCheckPicker
+              name="applyCourseIds"
+              legend="Also assign courses to this batch (optional)"
+              items={courses.map((c) => ({ id: c.id, label: c.name }))}
+              placeholder="Search courses…"
+            />
           </div>
           <div className="form-actions">
             <button type="submit">Add students to batch</button>

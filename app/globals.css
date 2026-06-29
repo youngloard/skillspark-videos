@@ -4064,6 +4064,37 @@ td code {
   background: transparent !important;
 }
 
+.dropdown-create {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 12px;
+  border: none;
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.dropdown-create:hover:not(:disabled) {
+  background: rgba(124, 92, 255, 0.12);
+}
+
+.dropdown-create:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.dropdown-create-error {
+  margin: 0;
+  padding: 6px 12px 8px;
+  font-size: 0.82rem;
+  color: #b00020;
+}
+
 @media (max-width: 1080px) {
   .admin-content > div > form,
   .admin-content > form,
