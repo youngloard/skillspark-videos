@@ -160,6 +160,12 @@ export default async function BatchEdit({ params }: { params: Promise<{ id: stri
               />
             </label>
           </div>
+          <div className="form-field-group">
+            <label>
+              Or upload Excel / CSV / TXT
+              <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt" />
+            </label>
+          </div>
           <div className="form-actions">
             <button type="submit">Add students</button>
           </div>

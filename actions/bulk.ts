@@ -12,6 +12,7 @@ import {
 } from "@/lib/bulk";
 import { bulkActionSchema, dateSchema, idSchema } from "@/lib/validations";
 import { z } from "zod";
+import * as XLSX from "xlsx";
 import { bad, withAdminD, type RD } from "./_shared";
 import { CATALOG_TAGS } from "@/lib/catalog-cache";
 
@@ -20,12 +21,35 @@ type R<T> = RD<T>;
 const MAX_TEXT_LEN = 200_000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Reads the pasted `text` plus an optional uploaded `file`, returning one text
+ * blob for the row parsers. Excel files (.xlsx/.xls) are converted to
+ * TAB-separated text (the first sheet) so multi-word cells like
+ * "KLM 2606 1282 Seethal U" stay in one column; CSV/TXT are read as-is.
+ */
 async function readFormText(formData: FormData): Promise<string | { error: string }> {
   let text = String(formData.get("text") ?? "");
   const file = formData.get("file");
   if (file instanceof File && file.size > 0) {
     if (file.size > MAX_FILE_BYTES) return { error: "file exceeds 5 MB" };
-    const fileText = await file.text();
+    const name = file.name.toLowerCase();
+    const isExcel =
+      name.endsWith(".xlsx") ||
+      name.endsWith(".xls") ||
+      file.type.includes("spreadsheetml") ||
+      file.type.includes("ms-excel");
+    let fileText: string;
+    if (isExcel) {
+      try {
+        const wb = XLSX.read(Buffer.from(await file.arrayBuffer()), { type: "buffer" });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        fileText = sheet ? XLSX.utils.sheet_to_csv(sheet, { FS: "\t", blankrows: false }) : "";
+      } catch {
+        return { error: "couldn't read that Excel file" };
+      }
+    } else {
+      fileText = await file.text();
+    }
     text = text ? `${text}\n${fileText}` : fileText;
   }
   return text;

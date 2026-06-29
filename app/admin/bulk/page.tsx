@@ -95,8 +95,8 @@ export default async function BulkPage() {
             </div>
             <div className="form-field-group">
               <label>
-                Or upload CSV / TXT
-                <input type="file" name="file" accept=".csv,.txt" />
+                Or upload Excel / CSV / TXT
+                <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt" />
               </label>
             </div>
             <div className="form-actions">
@@ -147,8 +147,8 @@ export default async function BulkPage() {
             </div>
             <div className="form-field-group" style={{ marginBottom: "20px" }}>
               <label>
-                Or upload CSV / TXT
-                <input type="file" name="file" accept=".csv,.txt" />
+                Or upload Excel / CSV / TXT
+                <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt" />
               </label>
             </div>
             <div className="form-grid">
@@ -213,8 +213,8 @@ export default async function BulkPage() {
             </div>
             <div className="form-field-group" style={{ marginBottom: "20px" }}>
               <label>
-                Or upload CSV / TXT
-                <input type="file" name="file" accept=".csv,.txt" />
+                Or upload Excel / CSV / TXT
+                <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt" />
               </label>
             </div>
             <h3 style={{ marginTop: "12px", marginBottom: "12px" }}>Apply to every batch (optional)</h3>
@@ -266,8 +266,8 @@ export default async function BulkPage() {
             </div>
             <div className="form-field-group">
               <label>
-                Or upload CSV / TXT
-                <input type="file" name="file" accept=".csv,.txt" />
+                Or upload Excel / CSV / TXT
+                <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt" />
               </label>
             </div>
             <div className="form-actions">
