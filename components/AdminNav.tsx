@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Search,
   ScrollText,
+  ShieldCheck,
   Sparkles,
   Upload,
   Users,
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/admin/bulk", label: "Bulk", icon: Upload },
   { href: "/admin/audit-logs", label: "Audit logs", icon: ScrollText },
   { href: "/admin/ai-assistant", label: "AI assistant", icon: Sparkles },
+  { href: "/admin/admins", label: "Admins", icon: ShieldCheck },
 ];
 
 export default function AdminNav() {

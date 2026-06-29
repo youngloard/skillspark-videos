@@ -137,10 +137,16 @@ export async function createStudentFormAction(
 export async function deleteStudent(studentId: string): Promise<R> {
   return withAdmin(async (admin) => {
     if (!idSchema.safeParse(studentId).success) return bad("invalid id");
-    const before = await prisma.student.findUnique({ where: { id: studentId } });
-    if (!before) return bad("not found");
-    await prisma.student.delete({ where: { id: studentId } });
-    await createAuditLog({
+    // `delete` returns the deleted row (DELETE … RETURNING), so we skip a
+    // separate findUnique — one fewer remote round-trip.
+    let before;
+    try {
+      before = await prisma.student.delete({ where: { id: studentId } });
+    } catch (e: any) {
+      if (e?.code === "P2025") return bad("not found");
+      throw e;
+    }
+    void createAuditLog({
       actorId: admin.id, actorEmail: admin.email, actorType: "admin",
       action: "STUDENT_DELETED", entityType: "Student", entityId: studentId,
       oldValue: before,

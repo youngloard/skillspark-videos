@@ -55,6 +55,10 @@ export type AuditAction =
   | "NOTE_DELETED"
   | "NOTE_DOWNLOAD_ENABLED"
   | "NOTE_DOWNLOAD_DISABLED"
+  // Admin accounts
+  | "ADMIN_CREATED"
+  | "ADMIN_UPDATED"
+  | "ADMIN_DELETED"
   // Auth/security
   | "ADMIN_LOGIN"
   | "STUDENT_LOGIN"
@@ -131,24 +135,26 @@ async function readRequestMeta(): Promise<{ ipAddress: string | null; userAgent:
 }
 
 export async function createAuditLog(input: CreateAuditLogInput): Promise<void> {
+  // Read request metadata (needs the active request scope) up front, then write
+  // the row WITHOUT awaiting it. The DB insert is a remote round-trip we don't
+  // want on the mutation's critical path — keeping it off the await chain makes
+  // every audited add/update/delete noticeably snappier. The write still
+  // completes on the (persistent) server; it's best-effort and never blocks the
+  // user flow.
   const meta = await readRequestMeta();
-  try {
-    await prisma.auditLog.create({
-      data: {
-        actorId: input.actorId ?? null,
-        actorEmail: input.actorEmail ?? null,
-        actorType: input.actorType,
-        action: input.action,
-        entityType: input.entityType ?? null,
-        entityId: input.entityId ?? null,
-        oldValue: safeStringify(input.oldValue),
-        newValue: safeStringify(input.newValue),
-        ipAddress: input.ipAddress ?? meta.ipAddress,
-        userAgent: input.userAgent ?? meta.userAgent,
-      },
-    });
-  } catch (err) {
-    // Audit logging must never break the user flow.
+  const data = {
+    actorId: input.actorId ?? null,
+    actorEmail: input.actorEmail ?? null,
+    actorType: input.actorType,
+    action: input.action,
+    entityType: input.entityType ?? null,
+    entityId: input.entityId ?? null,
+    oldValue: safeStringify(input.oldValue),
+    newValue: safeStringify(input.newValue),
+    ipAddress: input.ipAddress ?? meta.ipAddress,
+    userAgent: input.userAgent ?? meta.userAgent,
+  };
+  void prisma.auditLog.create({ data }).catch((err) => {
     console.error("[audit-log] failed to write", err);
-  }
+  });
 }

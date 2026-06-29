@@ -67,6 +67,17 @@ export const studentBatchesSchema = z.object({
   batchIds: idsArraySchema,
 });
 
+export const adminCreateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  email: emailSchema,
+});
+
+export const adminUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  email: emailSchema.optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+});
+
 export const batchSchema = z.object({
   batchCode: z
     .string()

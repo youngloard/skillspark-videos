@@ -13,24 +13,30 @@ import { useEffect, useState } from "react";
  */
 export default function ProgressLoader({
   label = "Loading…",
+  value,
 }: {
   label?: string;
+  /** Controlled 0-100 percentage. If omitted, the meter self-animates 0→100. */
+  value?: number;
 }) {
-  const [pct, setPct] = useState(0);
+  const [selfPct, setSelfPct] = useState(0);
+  const controlled = typeof value === "number";
+  const pct = controlled ? Math.max(0, Math.min(100, Math.round(value!))) : selfPct;
 
   useEffect(() => {
+    if (controlled) return;
     const DURATION = 1000; // ms to climb 0 → 100
     const start = performance.now();
     let raf = 0;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / DURATION);
       const eased = 1 - Math.pow(1 - t, 2); // ease-out
-      setPct(Math.round(eased * 100));
+      setSelfPct(Math.round(eased * 100));
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [controlled]);
 
   return (
     <div

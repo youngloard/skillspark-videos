@@ -100,41 +100,49 @@ export async function bulkAddStudentsToBatch(
       : [];
     const existingByEmail = new Map(existing.map((s) => [s.email, s.id]));
 
+    // Batched: at most ~3 round-trips regardless of how many students are
+    // pasted (was one round-trip PER row). 1) insert all new students, 2)
+    // resolve every row's id, 3) add them all to the batch.
     const nextCode = await makeCodeAllocator();
-    let created = 0;
-    let addedExisting = 0;
+    const newRows = rows.filter((r) => !existingByEmail.has(r.email));
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const existingId = existingByEmail.get(row.email);
-      try {
-        if (existingId) {
-          const r = await prisma.studentBatch.createMany({
-            data: [{ studentId: existingId, batchId: batch.id }],
-            skipDuplicates: true,
-          });
-          if (r.count > 0) addedExisting++; else skipped++;
-        } else {
-          const code = row.studentCode ?? nextCode();
-          await prisma.$transaction(async (tx) => {
-            const s = await tx.student.create({
-              data: {
-                studentCode: code,
-                name: row.name,
-                email: row.email,
-                accessStartDate: parsed.data.defaultStartDate,
-                accessEndDate: parsed.data.defaultEndDate,
-              },
-            });
-            await tx.studentBatch.create({ data: { studentId: s.id, batchId: batch.id } });
-          });
-          created++;
-        }
-      } catch (e: any) {
-        if (e?.code === "P2002") skipped++;
-        else failed.push({ line: i + 1, reason: "create failed" });
+    try {
+      if (newRows.length) {
+        await prisma.student.createMany({
+          data: newRows.map((r) => ({
+            studentCode: r.studentCode ?? nextCode(),
+            name: r.name,
+            email: r.email,
+            accessStartDate: parsed.data.defaultStartDate,
+            accessEndDate: parsed.data.defaultEndDate,
+          })),
+          skipDuplicates: true,
+        });
       }
+    } catch {
+      return bad("create failed");
     }
+
+    const all = rows.length
+      ? await prisma.student.findMany({
+          where: { email: { in: rows.map((r) => r.email) } },
+          select: { id: true, email: true },
+        })
+      : [];
+    const idByEmail = new Map(all.map((s) => [s.email, s.id]));
+    const created = all.length - existing.length; // net new students inserted
+
+    const studentIds = [
+      ...new Set(rows.map((r) => idByEmail.get(r.email)).filter((x): x is string => !!x)),
+    ];
+    const membership = studentIds.length
+      ? await prisma.studentBatch.createMany({
+          data: studentIds.map((studentId) => ({ studentId, batchId: batch.id })),
+          skipDuplicates: true,
+        })
+      : { count: 0 };
+    const addedExisting = Math.max(0, membership.count - created);
+    skipped += rows.length - created - addedExisting;
 
     await createAuditLog({
       actorId: admin.id, actorEmail: admin.email, actorType: "admin",

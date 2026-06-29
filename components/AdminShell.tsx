@@ -5,6 +5,19 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import AdminNav from "@/components/AdminNav";
 import { ToastProvider } from "@/components/Toast";
+import RouteWarmer from "@/components/RouteWarmer";
+
+const ADMIN_ROUTES = [
+  "/admin",
+  "/admin/students",
+  "/admin/batches",
+  "/admin/courses",
+  "/admin/search",
+  "/admin/bulk",
+  "/admin/audit-logs",
+  "/admin/ai-assistant",
+  "/admin/admins",
+];
 
 type Props = {
   userEmail: string;
@@ -44,6 +57,7 @@ export default function AdminShell({ userEmail, signOutAction, children }: Props
 
   return (
     <ToastProvider>
+    <RouteWarmer routes={ADMIN_ROUTES} sessionKey="sx-admin-warmed" label="Preparing your workspace…" />
     <div
       className="admin-shell"
       data-collapsed="true"

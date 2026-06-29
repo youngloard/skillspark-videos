@@ -352,6 +352,7 @@ export default async function StudentsPage({
         </span>
       </div>
       <ActionForm
+        className="roster-bulk-form"
         successMessage="Selected students deleted."
         confirm="Delete the selected students? This permanently removes them and their progress."
         action={async (fd: FormData) => {
@@ -362,7 +363,7 @@ export default async function StudentsPage({
         }}
       >
         <div className="bulk-toolbar">
-          <button type="submit" className="row-delete bulk-delete-btn">
+          <button type="submit" className="bulk-delete-btn">
             Delete selected
           </button>
           <span className="bulk-hint">Tick rows (or the header box) to select.</span>
