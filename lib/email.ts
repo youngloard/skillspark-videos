@@ -3,12 +3,18 @@ import nodemailer, { type Transporter } from "nodemailer";
 
 /**
  * Email provider. Pluggable like lib/drive.ts / lib/video-provider.ts: the rest
- * of the app calls `sendPersonalizedEmails()` and never touches SMTP details, so
- * swapping Zoho for Resend/SES later is a one-file change.
+ * of the app calls `sendPersonalizedEmails()` and never touches transport
+ * details.
  *
- * Config comes from env (never committed):
- *   EMAIL_SMTP_HOST, EMAIL_SMTP_PORT, EMAIL_SMTP_USER, EMAIL_SMTP_PASS,
- *   EMAIL_FROM_NAME, EMAIL_PLATFORM_URL
+ * Two transports, chosen automatically:
+ *   1. ZeptoMail HTTP API (PREFERRED) — Zoho's transactional email over HTTPS.
+ *      Works on hosts that firewall SMTP ports (e.g. Railway). Config:
+ *        ZEPTOMAIL_TOKEN, ZEPTOMAIL_API_URL, EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME
+ *   2. SMTP (nodemailer) — fallback for local/dev where SMTP isn't blocked.
+ *        EMAIL_SMTP_HOST/PORT/USER/PASS, EMAIL_FROM_NAME
+ *
+ * If a ZeptoMail token is present it wins; otherwise SMTP is used.
+ * Config comes from env (never committed).
  */
 
 export type EmailRecipient = {
@@ -25,17 +31,41 @@ export type SendSummary = {
 
 /** Max recipients handled in one call — guards against runaway sends. */
 export const MAX_RECIPIENTS_PER_SEND = 500;
-/** How many messages to send concurrently (matches the transporter pool). */
-const CONCURRENCY = 3;
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export function isEmailConfigured(): boolean {
+// ---- config ----
+
+type ZeptoConfig = {
+  token: string;
+  url: string;
+  fromAddress: string;
+  fromName: string;
+  replyTo: string;
+};
+
+function zeptoConfig(): ZeptoConfig | null {
+  const token = process.env.ZEPTOMAIL_TOKEN?.trim();
+  if (!token) return null;
+  return {
+    token,
+    url: process.env.ZEPTOMAIL_API_URL?.trim() || "https://api.zeptomail.in/v1.1/email",
+    fromAddress: process.env.EMAIL_FROM_ADDRESS?.trim() || process.env.EMAIL_SMTP_USER || "",
+    fromName: process.env.EMAIL_FROM_NAME?.trim() || "SkillSpark",
+    replyTo: replyToAddress(),
+  };
+}
+
+function smtpConfigured(): boolean {
   return Boolean(
     process.env.EMAIL_SMTP_HOST &&
       process.env.EMAIL_SMTP_USER &&
       process.env.EMAIL_SMTP_PASS,
   );
+}
+
+export function isEmailConfigured(): boolean {
+  return Boolean(zeptoConfig()) || smtpConfigured();
 }
 
 export function platformUrl(): string {
@@ -45,6 +75,12 @@ export function platformUrl(): string {
     "https://videos.skillspark.study"
   );
 }
+
+function replyToAddress(): string {
+  return process.env.EMAIL_REPLY_TO?.trim() || process.env.EMAIL_SMTP_USER || process.env.EMAIL_FROM_ADDRESS?.trim() || "";
+}
+
+// ---- SMTP transport (fallback) ----
 
 let cached: Transporter | null = null;
 function transporter(): Transporter {
@@ -58,13 +94,9 @@ function transporter(): Transporter {
       user: process.env.EMAIL_SMTP_USER,
       pass: process.env.EMAIL_SMTP_PASS,
     },
-    // Reuse a small pool of connections instead of a fresh TLS handshake per
-    // message — far faster for multi-recipient sends.
     pool: true,
     maxConnections: 3,
     maxMessages: 100,
-    // Hard timeouts so a slow/blocked network (e.g. a host that firewalls the
-    // SMTP port) fails fast and is reported, instead of hanging the request.
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 25_000,
@@ -72,15 +104,58 @@ function transporter(): Transporter {
   return cached;
 }
 
-function fromHeader(): string {
+function smtpFromHeader(): string {
   const name = process.env.EMAIL_FROM_NAME?.trim();
   const addr = process.env.EMAIL_SMTP_USER || "";
   return name ? `"${name.replace(/"/g, "")}" <${addr}>` : addr;
 }
 
-function replyToAddress(): string {
-  return process.env.EMAIL_REPLY_TO?.trim() || process.env.EMAIL_SMTP_USER || "";
+// ---- ZeptoMail transport (preferred; HTTPS, not blocked by Railway) ----
+
+async function sendViaZepto(
+  cfg: ZeptoConfig,
+  r: EmailRecipient,
+  subject: string,
+  text: string,
+  html: string,
+): Promise<void> {
+  const auth = cfg.token.startsWith("Zoho-enczapikey")
+    ? cfg.token
+    : `Zoho-enczapikey ${cfg.token}`;
+  const res = await fetch(cfg.url, {
+    method: "POST",
+    headers: {
+      Authorization: auth,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      from: { address: cfg.fromAddress, name: cfg.fromName },
+      to: [{ email_address: { address: r.email, name: r.name } }],
+      ...(cfg.replyTo ? { reply_to: [{ address: cfg.replyTo }] } : {}),
+      subject,
+      htmlbody: html,
+      textbody: text,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const j: any = await res.json();
+      detail =
+        j?.message ||
+        j?.error?.message ||
+        j?.error?.details?.[0]?.message ||
+        JSON.stringify(j);
+    } catch {
+      /* keep HTTP status */
+    }
+    throw new Error(String(detail).slice(0, 200));
+  }
 }
+
+// ---- templating ----
 
 /** Fill {{placeholders}} for one recipient. Unknown tokens are left as-is. */
 export function renderTemplate(tpl: string, r: EmailRecipient): string {
@@ -115,11 +190,14 @@ function textToHtml(text: string): string {
   return `<div style="font-family:system-ui,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111">${linked.replace(/\n/g, "<br>")}</div>`;
 }
 
+// ---- public send ----
+
 /**
  * Send an individually-addressed copy to each recipient (never a shared To/CC —
  * addresses are not leaked between students). Subject/body are templates; each
  * copy gets its placeholders resolved for that student. Invalid/empty emails are
- * reported in `skipped`; SMTP failures in `failed`. Deduped by lowercased email.
+ * reported in `skipped`; transport failures in `failed`. Deduped by lowercased
+ * email. Uses ZeptoMail HTTP if configured, else SMTP.
  */
 export async function sendPersonalizedEmails(
   recipients: EmailRecipient[],
@@ -128,7 +206,8 @@ export async function sendPersonalizedEmails(
 ): Promise<SendSummary> {
   const summary: SendSummary = { sent: 0, failed: [], skipped: [] };
 
-  if (!isEmailConfigured()) {
+  const zepto = zeptoConfig();
+  if (!zepto && !smtpConfigured()) {
     return {
       sent: 0,
       failed: [],
@@ -157,46 +236,56 @@ export async function sendPersonalizedEmails(
     valid.length = MAX_RECIPIENTS_PER_SEND;
   }
 
-  const from = fromHeader();
+  // HTTP can safely run more in parallel than pooled SMTP connections.
+  const concurrency = zepto ? 6 : 3;
+  const from = zepto ? "" : smtpFromHeader();
   const replyTo = replyToAddress();
   const unsubscribe = `<mailto:${replyTo}?subject=unsubscribe>`;
-  const tx = transporter();
+  const tx = zepto ? null : transporter();
 
-  // Small concurrency pool over pooled connections. One personalized copy each
-  // (not a big BCC), From aligned to the authenticating domain, plus Reply-To
-  // and List-Unsubscribe headers — keeps bulk mail out of spam alongside
-  // domain-level SPF/DKIM/DMARC. Connection reuse + timeouts (see transporter)
-  // keep it fast and prevent the request hanging on a slow/blocked network.
+  // One personalized copy each (not a big BCC). Deliverability rests on
+  // domain-level SPF/DKIM/DMARC (verified in ZeptoMail / DNS).
   let cursor = 0;
   async function worker() {
     while (cursor < valid.length) {
       const r = valid[cursor++];
       const subject = renderTemplate(subjectTpl, r).replace(/\s+/g, " ").trim();
       const text = renderTemplate(bodyTpl, r);
+      const html = textToHtml(text);
       try {
-        await tx.sendMail({
-          from,
-          to: r.email,
-          replyTo,
-          subject,
-          text,
-          html: textToHtml(text),
-          headers: { "List-Unsubscribe": unsubscribe },
-        });
+        if (zepto) {
+          await sendViaZepto(zepto, r, subject, text, html);
+        } else {
+          await tx!.sendMail({
+            from,
+            to: r.email,
+            replyTo,
+            subject,
+            text,
+            html,
+            headers: { "List-Unsubscribe": unsubscribe },
+          });
+        }
         summary.sent++;
       } catch (e: any) {
         summary.failed.push({ email: r.email, reason: e?.message ? String(e.message).slice(0, 200) : "send failed" });
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, valid.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, valid.length) }, worker));
 
   return summary;
 }
 
-/** Verify SMTP credentials/connection without sending. */
+/** Verify the transport without sending a real message (best-effort). */
 export async function verifyEmailConnection(): Promise<{ ok: boolean; error?: string }> {
-  if (!isEmailConfigured()) return { ok: false, error: "email not configured" };
+  const zepto = zeptoConfig();
+  if (zepto) {
+    // No cheap no-op verify on the HTTP API; treat a present token + from as OK.
+    if (!zepto.fromAddress) return { ok: false, error: "EMAIL_FROM_ADDRESS not set" };
+    return { ok: true };
+  }
+  if (!smtpConfigured()) return { ok: false, error: "email not configured" };
   try {
     await transporter().verify();
     return { ok: true };

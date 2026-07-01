@@ -59,6 +59,15 @@ async function deliver(
 
   const summary = await sendPersonalizedEmails(recipients, subject, body);
 
+  // Surface the actual SMTP error to the admin (and server logs) when nothing
+  // got through — otherwise "failed" is opaque and undiagnosable. The first
+  // failure reason distinguishes port-blocking (ETIMEDOUT/ECONNREFUSED) from
+  // auth (535) from config problems.
+  const errorSample = summary.failed[0]?.reason ?? summary.skipped[0]?.reason ?? null;
+  if (summary.sent === 0 && errorSample) {
+    console.error(`[email] all ${recipients.length} sends failed (${audit.source}): ${errorSample}`);
+  }
+
   await createAuditLog({
     actorId: actor.id, actorEmail: actor.email, actorType: "admin",
     action: "EMAIL_SENT", entityType: "Student",
@@ -69,9 +78,14 @@ async function deliver(
       sent: summary.sent,
       failed: summary.failed.length,
       skipped: summary.skipped.length,
+      errorSample,
       ...audit.extra,
     },
   });
+
+  if (summary.sent === 0 && errorSample) {
+    return bad(`Email failed: ${errorSample}`);
+  }
 
   return { ok: true, data: { ...summary, recipients: recipients.length } };
 }
