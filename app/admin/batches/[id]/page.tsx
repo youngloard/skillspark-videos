@@ -9,7 +9,7 @@ import MultiCheckPicker from "@/components/MultiCheckPicker";
 import ActionForm from "@/components/ActionForm";
 import ActionButton from "@/components/ActionButton";
 import BatchEmailLauncher from "@/components/BatchEmailLauncher";
-import { getDefaultEmailTemplate } from "@/actions/email";
+import { getDefaultEmailTemplate } from "@/lib/email-templates";
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);

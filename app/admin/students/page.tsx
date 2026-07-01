@@ -17,7 +17,7 @@ import ActionForm from "@/components/ActionForm";
 import SelectAllCheckbox from "@/components/SelectAllCheckbox";
 import FilterChips from "@/components/FilterChips";
 import StudentEmailLauncher from "@/components/StudentEmailLauncher";
-import { getDefaultEmailTemplate } from "@/actions/email";
+import { getDefaultEmailTemplate } from "@/lib/email-templates";
 import { getActiveBatches, getActiveCourses } from "@/lib/catalog-cache";
 import { getStudentsWithCourseAccess } from "@/lib/course-access";
 import { bulkAction } from "@/actions/bulk";

@@ -13,34 +13,10 @@ import {
   type EmailRecipient,
   type SendSummary,
 } from "@/lib/email";
+import { DEFAULT_TEMPLATE_KEY } from "@/lib/email-templates";
 import { bad, withAdminD, type RD } from "./_shared";
 
 export type EmailResult = SendSummary & { recipients: number };
-
-const DEFAULT_KEY = "default";
-
-const FALLBACK_SUBJECT = "Access your SkillSpark courses";
-const FALLBACK_BODY = `Hi {{name}},
-
-Your SkillSpark learning account is ready.
-
-How to access your content:
-1. Go to {{platformUrl}}
-2. Click "Sign in with Google" and use THIS email address ({{email}}).
-3. Your assigned courses appear on your dashboard.
-
-If you can't sign in, reply to this email and we'll help.
-
-— SkillSpark Academic Coordinator`;
-
-/** Load the admin-editable default template (seeded row, else a built-in). */
-export async function getDefaultEmailTemplate(): Promise<{ subject: string; body: string }> {
-  const row = await prisma.emailTemplate.findUnique({ where: { key: DEFAULT_KEY } });
-  return {
-    subject: row?.subject ?? FALLBACK_SUBJECT,
-    body: row?.body ?? FALLBACK_BODY,
-  };
-}
 
 /** Persist the default template so future composers prefill with it. */
 export async function saveDefaultEmailTemplate(input: unknown): Promise<RD<{ ok: true }>> {
@@ -48,13 +24,13 @@ export async function saveDefaultEmailTemplate(input: unknown): Promise<RD<{ ok:
     const parsed = emailContentSchema.safeParse(input);
     if (!parsed.success) return bad(parsed.error.issues[0].message);
     await prisma.emailTemplate.upsert({
-      where: { key: DEFAULT_KEY },
+      where: { key: DEFAULT_TEMPLATE_KEY },
       update: { subject: parsed.data.subject, body: parsed.data.body },
-      create: { key: DEFAULT_KEY, subject: parsed.data.subject, body: parsed.data.body },
+      create: { key: DEFAULT_TEMPLATE_KEY, subject: parsed.data.subject, body: parsed.data.body },
     });
     await createAuditLog({
       actorId: admin.id, actorEmail: admin.email, actorType: "admin",
-      action: "EMAIL_TEMPLATE_UPDATED", entityType: "EmailTemplate", entityId: DEFAULT_KEY,
+      action: "EMAIL_TEMPLATE_UPDATED", entityType: "EmailTemplate", entityId: DEFAULT_TEMPLATE_KEY,
     });
     return { ok: true, data: { ok: true } };
   });

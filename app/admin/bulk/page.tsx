@@ -7,7 +7,7 @@ import {
   bulkAddCoursesFromForm,
 } from "@/actions/bulk";
 import { quickCreateBatch } from "@/actions/batches";
-import { getDefaultEmailTemplate } from "@/actions/email";
+import { getDefaultEmailTemplate } from "@/lib/email-templates";
 import BulkEmailFields from "@/components/BulkEmailFields";
 import MultiCheckPicker from "@/components/MultiCheckPicker";
 import Dropdown from "@/components/Dropdown";
