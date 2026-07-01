@@ -3415,6 +3415,13 @@ td code {
   font-weight: 700;
 }
 
+/* While a page change is in flight, dim the controls so the click registers
+   instantly even before the new page's server render streams in. */
+.pagination[data-pending="true"] .pagination-controls {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 @media (max-width: 720px) {
   .pagination {
     justify-content: center;
@@ -9980,18 +9987,29 @@ textarea {
   max-width: 240px;
 }
 
-/* Batch chip */
+/* Batch chips: a student can be in several batches, so wrap them neatly into
+   a tidy grid of small monospace tags instead of overflowing the cell. */
+.batch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  max-width: 180px;
+}
 .batch-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 34px;
   border: 1px solid rgba(31, 35, 51, 0.16);
-  border-radius: 8px;
-  padding: 3px 9px;
+  border-radius: 7px;
+  padding: 2px 8px;
   background: var(--surface-2);
   color: var(--gk-dark);
   font-family: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
+  line-height: 1.5;
   white-space: nowrap;
 }
 

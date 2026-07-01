@@ -1,4 +1,9 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type Props = {
@@ -19,7 +24,8 @@ export default function Pagination({
   basePath,
   searchParams,
 }: Props) {
-  if (total === 0) return null;
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
 
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
@@ -38,8 +44,30 @@ export default function Pagination({
   const isFirst = page <= 1;
   const isLast = page >= totalPages;
 
+  // Prefetch every reachable page target immediately (Next only auto-prefetches
+  // links once they scroll into view — pagination sits at the bottom, so warm
+  // them up front to make clicks feel instant).
+  useEffect(() => {
+    if (total === 0) return;
+    const targets = new Set<number>([page - 1, page + 1, ...visible.filter((v): v is number => v !== "…")]);
+    targets.forEach((p) => {
+      if (p >= 1 && p <= totalPages && p !== page) router.prefetch(buildHref(p));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, totalPages, total]);
+
+  if (total === 0) return null;
+
+  // Soft-navigate inside a transition for instant pending feedback; keep the
+  // real href so middle-click / modifier-click still opens a new tab.
+  const go = (e: React.MouseEvent, href: string) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    startTransition(() => router.push(href, { scroll: false }));
+  };
+
   return (
-    <nav className="pagination" aria-label="Pagination">
+    <nav className="pagination" aria-label="Pagination" data-pending={pending ? "true" : undefined}>
       <span className="pagination-meta">
         Showing <strong>{start.toLocaleString()}</strong>–
         <strong>{end.toLocaleString()}</strong> of{" "}
@@ -53,9 +81,10 @@ export default function Pagination({
           </span>
         ) : (
           <Link
-            href={buildHref(Math.max(1, page - 1))}
+            href={buildHref(page - 1)}
             className="pagination-btn"
             rel="prev"
+            onClick={(e) => go(e, buildHref(page - 1))}
           >
             <ChevronLeft size={14} aria-hidden="true" />
             Prev
@@ -74,6 +103,7 @@ export default function Pagination({
               className="pagination-btn pagination-num"
               data-active={p === page ? "true" : undefined}
               aria-current={p === page ? "page" : undefined}
+              onClick={(e) => go(e, buildHref(p))}
             >
               {p}
             </Link>
@@ -87,9 +117,10 @@ export default function Pagination({
           </span>
         ) : (
           <Link
-            href={buildHref(Math.min(totalPages, page + 1))}
+            href={buildHref(page + 1)}
             className="pagination-btn"
             rel="next"
+            onClick={(e) => go(e, buildHref(page + 1))}
           >
             Next
             <ChevronRight size={14} aria-hidden="true" />

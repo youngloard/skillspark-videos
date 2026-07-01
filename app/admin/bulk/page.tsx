@@ -66,14 +66,7 @@ export default async function BulkPage() {
         <ColumnSpec
           required={["email", "student id + name"]}
           optional={[]}
-          notes={[
-            "Paste/upload the shared roster: column 1 = email, column 2 = the student id followed by the name (e.g. KLM 2606 1282 Seethal U → id \"KLM 2606 1282\", name \"Seethal U\").",
-            "The student id is admin-given (taken from the file), never auto-generated.",
-            "The sheet's title/header rows are ignored automatically.",
-            "Pick the batch first — students inherit its courses. No matching batch? Type a name in the batch box and choose “Add batch” to create it on the spot.",
-            "Optionally tick courses below to assign them to the batch in the same step (handy for a brand-new batch).",
-            "Already-added students (matched by email or id) are skipped, so re-uploading the same file with new rows only adds the new ones.",
-          ]}
+          notes={["Column 1 = email, column 2 = student id then name. Pick the batch first."]}
           example="seethaludayan4@gmail.com, KLM 2606 1282 Seethal U"
         />
         <ActionForm
@@ -156,12 +149,7 @@ export default async function BulkPage() {
         <ColumnSpec
           required={["studentCode", "name", "email"]}
           optional={["batchCode", "courseNames"]}
-          notes={[
-            "Separate multiple courses with a + (e.g. Excel+SQL).",
-            "An unknown batchCode is auto-created; the named courses are assigned to that batch.",
-            "Courses must already exist (create them in Bulk add courses first).",
-            "Existing students (matched by email or studentCode) are skipped.",
-          ]}
+          notes={["Courses: separate with + (must already exist). Unknown batchCode is auto-created."]}
           example="S001,Alice,alice@example.com,ONLB101,Excel+SQL"
         />
         <ActionForm
@@ -224,10 +212,7 @@ export default async function BulkPage() {
         <ColumnSpec
           required={["batchCode", "batchName"]}
           optional={["description", "courseNames"]}
-          notes={[
-            "Separate multiple courses with a + (e.g. Excel+SQL).",
-            "Existing batches (matched by batchCode) are skipped.",
-          ]}
+          notes={["Courses: separate with + (e.g. Excel+SQL)."]}
           example="ONLB201,Online Batch 201,Spring intake,Excel+SQL"
         />
         <ActionForm
@@ -280,10 +265,7 @@ export default async function BulkPage() {
         <ColumnSpec
           required={["name"]}
           optional={["description", "status"]}
-          notes={[
-            "status is either active (default) or inactive.",
-            "Existing courses (matched by name) are skipped.",
-          ]}
+          notes={["status: active (default) or inactive."]}
           example="Tally,Tally accounting basics,active"
         />
         <ActionForm
