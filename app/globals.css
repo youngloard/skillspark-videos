@@ -5889,6 +5889,19 @@ table th, table td {
   margin-top: 0 !important;
 }
 
+/* ...but a picker's row checkbox must stay a small native checkbox, not get
+   stretched to a full-width 46px box (which fills solid when ticked and looks
+   buggy). Mirror the base input[type=checkbox] so it's identical to the
+   student add-student picker: 18px, on the left, accent tick. */
+.form-field-group .picker-list input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  accent-color: var(--accent) !important;
+  cursor: pointer !important;
+}
+
 .pickers-grid {
   display: grid !important;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)) !important;
